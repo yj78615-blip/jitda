@@ -35,8 +35,8 @@ export default async function SeriesDetailPage({
       <header className="site-header">
         <div className="container">
           <Link href="/" className="brand">
-            <span className="brand-mark">짓다</span>
-            <span className="brand-sub">JITDA</span>
+            <span className="brand-mark">IF</span>
+            
           </Link>
           <div className="searchbox">
             <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -154,7 +154,7 @@ export default async function SeriesDetailPage({
 
       <footer className="site-footer">
         <div className="container">
-          <div>© 2026 짓다 · JITDA</div>
+          <div>© 2026 IF</div>
           <div className="footer-links">
             <Link href="/">홈</Link>
             <Link href="/studio">스튜디오</Link>

@@ -9,7 +9,7 @@ type Tab = 'login' | 'signup';
 export default function AuthPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('login');
-  const [form, setForm] = useState({ email: '', password: '', name: '', confirmPassword: '' });
+  const [form, setForm] = useState({ email: '', password: '', name: '', handle: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -28,7 +28,7 @@ export default function AuthPage() {
         const res = await fetch('/api/v1/auth/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: form.email, password: form.password, displayName: form.name }),
+          body: JSON.stringify({ email: form.email, password: form.password, display_name: form.name, handle: form.handle }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -61,8 +61,8 @@ export default function AuthPage() {
     <div className="auth-page">
       <div className="auth-container">
         <Link href="/" className="auth-brand">
-          <span className="brand-mark">짓다</span>
-          <span className="brand-sub">JITDA</span>
+          <span className="brand-mark">IF</span>
+          
         </Link>
 
         <div className="auth-card">
@@ -87,18 +87,36 @@ export default function AuthPage() {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             {tab === 'signup' && (
-              <div className="auth-field">
-                <label htmlFor="name">이름</label>
-                <input
-                  id="name"
-                  type="text"
-                  placeholder="작가명 또는 닉네임"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                  autoComplete="name"
-                />
-              </div>
+              <>
+                <div className="auth-field">
+                  <label htmlFor="name">이름</label>
+                  <input
+                    id="name"
+                    type="text"
+                    placeholder="작가명 또는 닉네임"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                    maxLength={30}
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="auth-field">
+                  <label htmlFor="handle">핸들 (/@)</label>
+                  <input
+                    id="handle"
+                    type="text"
+                    placeholder="lowercase 소문자 · 숫자 · _"
+                    value={form.handle}
+                    onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                    required
+                    minLength={3}
+                    maxLength={20}
+                    pattern="[a-z0-9_]{3,20}"
+                    autoComplete="username"
+                  />
+                </div>
+              </>
             )}
 
             <div className="auth-field">
@@ -123,7 +141,7 @@ export default function AuthPage() {
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 required
-                minLength={8}
+                minLength={10}
                 autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
               />
             </div>
@@ -138,7 +156,7 @@ export default function AuthPage() {
                   value={form.confirmPassword}
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                   required
-                  minLength={8}
+                  minLength={10}
                   autoComplete="new-password"
                 />
               </div>

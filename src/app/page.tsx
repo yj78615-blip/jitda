@@ -118,8 +118,8 @@ export default async function Home({
       <header className="site-header">
         <div className="container">
           <Link href="/" className="brand">
-            <span className="brand-mark">짓다</span>
-            <span className="brand-sub">JITDA</span>
+            <span className="brand-mark">IF</span>
+            
           </Link>
           <div className="searchbox">
             <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -146,7 +146,7 @@ export default async function Home({
         <div className="container">
           <div className="section-head">
             <div className="section-eyebrow">이번 주 · 라이브 DB</div>
-            <h1 className="section-title">지금 짓다에서 가장 뜨거운 것</h1>
+            <h1 className="section-title">지금 IF에서 가장 뜨거운 것</h1>
           </div>
 
           <div className="tabs" role="tablist">
@@ -187,7 +187,7 @@ export default async function Home({
 
       <footer className="site-footer">
         <div className="container">
-          <div>© 2026 짓다 · JITDA · <span style={{ color: 'var(--accent)', fontWeight: 600 }}>LIVE</span></div>
+          <div>© 2026 IF · <span style={{ color: 'var(--accent)', fontWeight: 600 }}>LIVE</span></div>
           <div className="footer-links">
             <Link href="/portal.html">전체 목업</Link>
             <Link href="/specs/prd.html">PRD</Link>

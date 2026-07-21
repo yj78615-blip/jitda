@@ -36,8 +36,8 @@ export default function StudioPage() {
         <div className="container">
           <div className="studio-header-left">
             <Link href="/" className="brand">
-              <span className="brand-mark">짓다</span>
-              <span className="brand-sub">JITDA</span>
+              <span className="brand-mark">IF</span>
+              
             </Link>
             <span className="studio-badge">STUDIO</span>
           </div>

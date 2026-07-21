@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<title>로그인 · 회원가입 — 짓다</title>
+<title>로그인 · 회원가입 — IF</title>
 <style>
   :root {
     --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
@@ -353,8 +353,8 @@
 
 <header class="site-header">
   <div class="brand">
-    <span class="brand-mark">짓다</span>
-    <span class="brand-sub">JITDA</span>
+    <span class="brand-mark">IF</span>
+    
   </div>
   <button class="theme-toggle" id="themeToggle" aria-label="테마 전환" title="테마 전환">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -801,7 +801,7 @@
       s.email && s.password && s.handle && s.display_name && s.agreed && !s.submitting;
 
     return `
-      <h1 class="card-title">짓다에 가입하기</h1>
+      <h1 class="card-title">IF에 가입하기</h1>
       <div class="card-sub">누구나 그리고, 누구나 만나요.</div>
       ${renderTabs()}
       ${renderOAuth()}
