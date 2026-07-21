@@ -1,34 +1,234 @@
+/* ==========================================================================
+   짓다 (JITDA) — Design System
+   통합 CSS 변수. 모든 mockup (main/auth/viewer/author/studio) 에서 추출.
+   ========================================================================== */
+
 :root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Pretendard", "Segoe UI", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Light mode */
   --paper: #f4f3f0;
+  --paper-2: #ebe9e3;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
   --ink: #17141a;
   --ink-2: #3f3946;
   --muted: #7a7480;
   --line: #e6e2dd;
+  --line-2: #d8d3cc;
   --accent: #ee2c56;
-  --surface: #ffffff;
+  --accent-hover: #d61e46;
+  --gold: #c78e28;
+  --success: #2f8f5d;
+  --warning: #d69a2a;
+  --danger: #c94848;
+
+  --shadow-sm: 0 1px 2px rgba(30, 20, 40, 0.05);
+  --shadow-md: 0 2px 6px rgba(30, 20, 40, 0.06), 0 12px 32px rgba(30, 20, 40, 0.06);
+  --shadow-xl: 0 24px 80px rgba(30, 20, 40, 0.2);
+
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  --skeleton-a: rgba(30, 20, 40, 0.06);
+  --skeleton-b: rgba(30, 20, 40, 0.10);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --paper: #0d0c10;
+    --paper-2: #08070b;
+    --surface: #17151b;
+    --surface-2: #1a181f;
     --ink: #f0edf1;
     --ink-2: #cac4d0;
     --muted: #8b8492;
     --line: #24222a;
+    --line-2: #33303a;
     --accent: #ff5573;
-    --surface: #17151b;
+    --accent-hover: #ff7a92;
+    --gold: #e8b13a;
+    --success: #4bb87a;
+    --warning: #e8b13a;
+    --danger: #e07070;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.35);
+    --shadow-xl: 0 24px 80px rgba(0, 0, 0, 0.6);
+
+    --skeleton-a: rgba(255, 255, 255, 0.05);
+    --skeleton-b: rgba(255, 255, 255, 0.10);
   }
 }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+:root[data-theme="dark"] {
+  --paper: #0d0c10;
+  --paper-2: #08070b;
+  --surface: #17151b;
+  --surface-2: #1a181f;
+  --ink: #f0edf1;
+  --ink-2: #cac4d0;
+  --muted: #8b8492;
+  --line: #24222a;
+  --line-2: #33303a;
+  --accent: #ff5573;
+  --accent-hover: #ff7a92;
+  --gold: #e8b13a;
+  --success: #4bb87a;
+  --warning: #e8b13a;
+  --danger: #e07070;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 24px 80px rgba(0, 0, 0, 0.6);
+  --skeleton-a: rgba(255, 255, 255, 0.05);
+  --skeleton-b: rgba(255, 255, 255, 0.10);
+}
+
+:root[data-theme="light"] {
+  --paper: #f4f3f0;
+  --paper-2: #ebe9e3;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --ink: #17141a;
+  --ink-2: #3f3946;
+  --muted: #7a7480;
+  --line: #e6e2dd;
+  --line-2: #d8d3cc;
+  --accent: #ee2c56;
+  --accent-hover: #d61e46;
+  --gold: #c78e28;
+  --success: #2f8f5d;
+  --warning: #d69a2a;
+  --danger: #c94848;
+  --shadow-sm: 0 1px 2px rgba(30, 20, 40, 0.05);
+  --shadow-md: 0 2px 6px rgba(30, 20, 40, 0.06), 0 12px 32px rgba(30, 20, 40, 0.06);
+  --shadow-xl: 0 24px 80px rgba(30, 20, 40, 0.2);
+  --skeleton-a: rgba(30, 20, 40, 0.06);
+  --skeleton-b: rgba(30, 20, 40, 0.10);
+}
+
+/* ==========================================================================
+   Base reset
+   ========================================================================== */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body { min-height: 100%; margin: 0; padding: 0; }
+
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
-    "Segoe UI", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-a { color: inherit; }
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+
+h1, h2, h3 { margin: 0; font-weight: 700; text-wrap: balance; }
+
+a { color: inherit; text-decoration: none; }
+
+/* ==========================================================================
+   Utility
+   ========================================================================== */
+
+.container {
+  width: min(100% - 40px, 1240px);
+  margin: 0 auto;
+}
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* Skeleton loader */
+.skeleton {
+  background: linear-gradient(90deg, var(--skeleton-a) 0%, var(--skeleton-b) 50%, var(--skeleton-a) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius);
+}
+@keyframes shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Error state */
+.error-state {
+  max-width: 480px; margin: 80px auto;
+  padding: 60px 24px; text-align: center;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.error-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.error-icon svg { width: 22px; height: 22px; }
+.error-title { font-size: 16px; font-weight: 700; color: var(--ink); }
+.error-message { font-size: 14px; color: var(--ink-2); max-width: 40ch; }
+.error-code {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--muted);
+  padding: 3px 8px; background: var(--paper); border-radius: 3px;
+}
+.btn-retry {
+  margin-top: 4px; height: 36px; padding: 0 16px;
+  border-radius: 999px; background: var(--ink); color: var(--paper);
+  font-weight: 600; font-size: 13px; transition: opacity 0.15s;
+}
+.btn-retry:hover { opacity: 0.85; }
+
+/* Spinner */
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: white;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast-root {
+  position: fixed; bottom: 88px; left: 50%; transform: translateX(-50%);
+  z-index: 200;
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  pointer-events: none;
+}
+.toast {
+  padding: 11px 20px; border-radius: 999px;
+  background: var(--ink); color: var(--paper);
+  font-size: 14px; font-weight: 600;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+  animation: toast-in 0.2s cubic-bezier(0.2, 0, 0, 1);
+  max-width: 90vw;
+}
+.toast.error { background: var(--accent); color: white; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

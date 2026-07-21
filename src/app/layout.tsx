@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './main.css';
 
 export const metadata: Metadata = {
   title: '짓다 · JITDA — 웹툰 오픈 플랫폼',
