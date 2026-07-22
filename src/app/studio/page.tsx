@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useAuth, type AuthUser } from '@/lib/auth-context';
+import { useAuth, getAccessToken, type AuthUser } from '@/lib/auth-context';
+import { GENRES } from '@/lib/genres';
 import { useRouter } from 'next/navigation';
 
 /* ---------- types ---------- */
@@ -153,7 +154,14 @@ export default function StudioPage() {
             onNav={setSection}
           />
         )}
-        {section === 'upload' && <UploadSection />}
+        {section === 'upload' && (
+          <UploadSection
+            onCreated={async () => {
+              if (user) await fetchSeries(user.id);
+              setSection('works');
+            }}
+          />
+        )}
         {section === 'payouts' && <PayoutsSection />}
         {section === 'settings' && <SettingsSection user={user} />}
       </main>
@@ -384,26 +392,168 @@ function WorksSection({
    Upload
    ================================================================ */
 
-function UploadSection() {
+function UploadSection({ onCreated }: { onCreated: () => Promise<void> | void }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  const toggleGenre = (g: string) => {
+    setGenres((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : prev.length >= 3 ? prev : [...prev, g]
+    );
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!title.trim()) { setError('제목을 입력해주세요.'); return; }
+    if (genres.length === 0) { setError('장르를 1개 이상 선택해주세요.'); return; }
+
+    const token = getAccessToken();
+    if (!token) { setError('로그인이 필요합니다.'); return; }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/v1/series', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          genres,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error?.message || '작품 생성에 실패했습니다.');
+        return;
+      }
+      setOk(true);
+      setTitle(''); setDescription(''); setGenres([]);
+      await onCreated();
+    } catch {
+      setError('네트워크 오류. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <>
       <div className="studio-page-head">
         <div>
           <h1 className="studio-page-title">업로드</h1>
-          <div className="studio-page-sub">새 회차 또는 개별 포스트 업로드</div>
+          <div className="studio-page-sub">새 시리즈를 만들어 게시하세요</div>
         </div>
       </div>
-      <div className="studio-card" style={{ padding: '60px 24px', textAlign: 'center' }}>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)"
-          strokeWidth="1.5" style={{ margin: '0 auto 12px', display: 'block' }}>
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>업로드 기능 준비 중</h3>
-        <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 360, margin: '0 auto' }}>
-          이미지 업로드, 에피소드 편집, 포스트 작성 기능이 곧 추가됩니다.
+
+      <form onSubmit={submit} className="studio-card" style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
+        <div>
+          <label htmlFor="s-title" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+            제목 <span style={{ color: 'var(--accent)' }}>*</span>
+          </label>
+          <input
+            id="s-title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={100}
+            required
+            placeholder="예: 달빛 아래 우리"
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 14,
+              border: '1px solid var(--line)', borderRadius: 8,
+              background: 'var(--surface)', color: 'var(--ink)',
+            }}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="s-desc" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+            소개
+          </label>
+          <textarea
+            id="s-desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={2000}
+            rows={4}
+            placeholder="작품 소개를 짧게 적어주세요."
+            style={{
+              width: '100%', padding: '10px 12px', fontSize: 14, resize: 'vertical',
+              border: '1px solid var(--line)', borderRadius: 8,
+              background: 'var(--surface)', color: 'var(--ink)', fontFamily: 'inherit',
+            }}
+          />
+        </div>
+
+        <div>
+          <label className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+            장르 <span style={{ color: 'var(--accent)' }}>*</span>{' '}
+            <span style={{ color: 'var(--muted)', fontSize: 11 }}>(최대 3개)</span>
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {GENRES.map((g) => {
+              const active = genres.includes(g.slug);
+              return (
+                <button
+                  type="button"
+                  key={g.slug}
+                  onClick={() => toggleGenre(g.slug)}
+                  style={{
+                    padding: '6px 14px', fontSize: 13, borderRadius: 999,
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+                    background: active ? 'var(--accent)' : 'var(--surface)',
+                    color: active ? '#fff' : 'var(--ink)',
+                    cursor: 'pointer', fontWeight: active ? 600 : 400,
+                  }}
+                >
+                  {g.nameKo}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {error && (
+          <div style={{
+            padding: '10px 12px', fontSize: 13, borderRadius: 8,
+            background: 'color-mix(in oklab, var(--danger) 12%, transparent)',
+            color: 'var(--danger)',
+          }}>
+            {error}
+          </div>
+        )}
+        {ok && !error && (
+          <div style={{
+            padding: '10px 12px', fontSize: 13, borderRadius: 8,
+            background: 'color-mix(in oklab, var(--success) 12%, transparent)',
+            color: 'var(--success)',
+          }}>
+            작품을 게시했습니다.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            type="submit"
+            className="btn studio-btn-accent"
+            disabled={submitting}
+          >
+            {submitting ? '게시 중...' : '작품 게시하기'}
+          </button>
+        </div>
+
+        <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>
+          시리즈를 먼저 만든 뒤 각 회차를 추가할 수 있습니다. 회차 이미지 업로드는 Storage 연결 후 오픈됩니다.
         </p>
-      </div>
+      </form>
     </>
   );
 }

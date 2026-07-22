@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { toSeriesDTO, type SeriesDTO } from '@/lib/mappers';
@@ -48,8 +47,10 @@ export default async function AuthorProfilePage({
       bio: true,
       avatarImageId: true,
       createdAt: true,
-      authorProfile: { select: { subscriptionEnabled: true, subscriptionPrice: true, subscriptionCurrency: true } },
-      _count: { select: { followers: true, series: true, posts: true } },
+      authorProfile: {
+        select: { subscriptionEnabled: true, subscriptionPrice: true, subscriptionCurrency: true },
+      },
+      _count: { select: { followers: true, subscribers: true, series: true, posts: true } },
     },
   });
 
@@ -93,64 +94,50 @@ export default async function AuthorProfilePage({
   );
 
   const initial = author.displayName.charAt(0).toUpperCase();
+  const subscription = {
+    enabled: author.authorProfile?.subscriptionEnabled ?? false,
+    price: author.authorProfile?.subscriptionPrice ?? null,
+    currency: author.authorProfile?.subscriptionCurrency ?? 'KRW',
+  };
 
   return (
-    <div className="author-root">
-      <div className="author-banner" style={{ background: `linear-gradient(135deg, ${g1}, ${g2})` }} />
+    <div className="app">
+      <div className="page">
+        <div className="page-inner">
+          <div className="banner" style={{ '--g1': g1, '--g2': g2 } as React.CSSProperties} />
 
-      <header className="author-header">
-        <nav className="author-top-nav">
-          <Link href="/" className="author-logo">IF</Link>
-        </nav>
-      </header>
-
-      <main className="author-main">
-        <div className="author-hero">
-          <div className="author-avatar" style={{ background: `linear-gradient(135deg, ${g2}, ${g1})` }}>
-            {initial}
-          </div>
-
-          <div className="author-hero-info">
-            <h1 className="author-name">{author.displayName}</h1>
-            <div className="author-handle-line">
-              <span className="author-handle">@{author.handle}</span>
+          <div className="hero">
+            <div className="hero-avatar" style={{ '--g1': g2, '--g2': g1 } as React.CSSProperties}>
+              {initial}
             </div>
-            {author.bio && <p className="author-bio">{author.bio}</p>}
+            <div className="hero-info">
+              <h1 className="hero-name">{author.displayName}</h1>
+              <div className="hero-handle">@{author.handle}</div>
+              {author.bio && <p className="hero-bio">{author.bio}</p>}
+            </div>
+            <AuthorHeroActions
+              authorId={author.id}
+              displayName={author.displayName}
+              handle={author.handle}
+              subscription={subscription}
+            />
           </div>
 
-          <AuthorHeroActions
+          <div className="stats">
+            <div className="stat"><span className="num">{fmtNum(author._count.followers)}</span> 팔로워</div>
+            <div className="stat"><span className="num">{fmtNum(author._count.subscribers)}</span> 구독자</div>
+            <div className="stat"><span className="num">{author._count.series}</span> 시리즈</div>
+            <div className="stat"><span className="num">{author._count.posts}</span> 포스트</div>
+          </div>
+
+          <AuthorContent
             authorId={author.id}
-            displayName={author.displayName}
-            handle={author.handle}
-            subscription={{
-              enabled: author.authorProfile?.subscriptionEnabled ?? false,
-              price: author.authorProfile?.subscriptionPrice ?? null,
-              currency: author.authorProfile?.subscriptionCurrency ?? 'KRW',
-            }}
+            authorName={author.displayName}
+            series={series}
+            subscription={subscription}
           />
         </div>
-
-        <div className="author-stats-bar">
-          <div className="author-stat">
-            <span className="author-stat-num">{fmtNum(author._count.series)}</span>
-            <span className="author-stat-label">작품</span>
-          </div>
-          <div className="author-stat">
-            <span className="author-stat-num">{fmtNum(author._count.posts)}</span>
-            <span className="author-stat-label">포스트</span>
-          </div>
-          <div className="author-stat">
-            <span className="author-stat-num">{fmtNum(author._count.followers)}</span>
-            <span className="author-stat-label">팔로워</span>
-          </div>
-          <div className="author-stat">
-            <span className="author-stat-num">{fmtNum(series.reduce((a, s) => a + s.stats.views_total, 0))}</span>
-            <span className="author-stat-label">조회</span>
-          </div>
-        </div>
-
-        <AuthorContent authorId={author.id} series={series} />
-      </main>
+      </div>
     </div>
   );
 }

@@ -6,14 +6,18 @@ import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
+// IDOR 방지: 업로드 시 episode/post 링크를 받지 않는다.
+// attach 는 PATCH /episodes/{id} · PATCH /posts/{id} 의 image_ids 경로에서
+// assertOwnedReadyImages 를 통과할 때만 일어난다.
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MiB
+const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+
 const UploadSchema = z.object({
   purpose: z.enum(['episode_page', 'series_cover', 'post_page', 'avatar', 'banner']),
-  episode_id: z.string().optional(),
-  post_id: z.string().optional(),
-  content_type: z.string().optional(),
-  file_size: z.number().int().positive().optional(),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
+  content_type: z.enum(ALLOWED_CONTENT_TYPES).optional(),
+  file_size: z.number().int().positive().max(MAX_FILE_SIZE).optional(),
+  width: z.number().int().positive().max(20000).optional(),
+  height: z.number().int().positive().max(20000).optional(),
 });
 
 export const POST = withErrors(async (req: NextRequest) => {
@@ -25,7 +29,7 @@ export const POST = withErrors(async (req: NextRequest) => {
   const parsed = UploadSchema.safeParse(raw);
   if (!parsed.success) throw badRequest('잘못된 업로드 요청입니다.');
 
-  const { purpose, episode_id, post_id, content_type, file_size, width, height } = parsed.data;
+  const { purpose, content_type, file_size, width, height } = parsed.data;
 
   const { customAlphabet } = await import('nanoid');
   const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 20);
@@ -36,10 +40,10 @@ export const POST = withErrors(async (req: NextRequest) => {
       id,
       uploaderId: user.id,
       purpose,
-      episodeId: episode_id ?? null,
-      postId: post_id ?? null,
-      ownerType: episode_id ? 'EPISODE' : post_id ? 'POST' : null,
-      ownerId: episode_id ?? post_id ?? null,
+      episodeId: null,
+      postId: null,
+      ownerType: null,
+      ownerId: null,
       contentType: content_type ?? null,
       fileSize: file_size ?? null,
       width: width ?? null,
