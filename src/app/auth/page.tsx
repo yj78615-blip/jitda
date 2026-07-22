@@ -1,14 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 
 type Tab = 'login' | 'signup';
 
 export default function AuthPage() {
-  const router = useRouter();
+  return (
+    <Suspense fallback={<div className="auth-page" />}>
+      <AuthForm />
+    </Suspense>
+  );
+}
+
+function AuthForm() {
   const searchParams = useSearchParams();
   const { login, signup } = useAuth();
   const redirectTo = searchParams.get('redirect') || '/';
