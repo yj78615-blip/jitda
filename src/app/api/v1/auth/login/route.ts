@@ -32,19 +32,19 @@ export const POST = withErrors(async (req: NextRequest) => {
   const ip = getClientIp(req.headers);
   const userAgent = req.headers.get('user-agent');
 
-  // 잠금 확인
-  await checkLoginLockout({ email, ip });
-
-  const user = await db.user.findUnique({
-    where: { email },
-    select: {
-      id: true, passwordHash: true, role: true, handle: true, displayName: true,
-      status: true, emailVerifiedAt: true,
-    },
-  });
+  // Phase 1 — lockout + 사용자 조회를 병렬로 (2 RTT → 1 RTT)
+  const [, user] = await Promise.all([
+    checkLoginLockout({ email, ip }),
+    db.user.findUnique({
+      where: { email },
+      select: {
+        id: true, passwordHash: true, role: true, handle: true, displayName: true,
+        status: true, emailVerifiedAt: true,
+      },
+    }),
+  ]);
 
   if (!user || !user.passwordHash) {
-    // 존재하지 않아도 실 해싱만큼 CPU 소비 → timing attack 방어
     await burnCpuLikeAVerify(password);
     await recordLoginAttempt({ email, ip, userAgent }, false);
     throw invalidCredentials();
@@ -52,7 +52,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 
   if (user.status !== 'ACTIVE') {
     await recordLoginAttempt({ email, ip, userAgent, userId: user.id }, false);
-    throw invalidCredentials(); // 계정 상태 구체 노출 X
+    throw invalidCredentials();
   }
 
   const ok = await verifyPassword(password, user.passwordHash);
@@ -61,20 +61,21 @@ export const POST = withErrors(async (req: NextRequest) => {
     throw invalidCredentials();
   }
 
-  await recordLoginAttempt({ email, ip, userAgent, userId: user.id }, true);
-
-  // 토큰 발급
-  const accessToken = await signAccessToken({ sub: user.id, role: user.role, handle: user.handle });
+  // Phase 2 — JWT 발급 + 성공 기록 + 토큰 저장을 병렬로 (2 RTT → 1 RTT)
   const refresh = issueRefreshToken();
-  await db.refreshToken.create({
-    data: {
-      userId: user.id,
-      tokenHash: refresh.hash,
-      userAgent: userAgent ?? undefined,
-      ip,
-      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SEC * 1000),
-    },
-  });
+  const [accessToken] = await Promise.all([
+    signAccessToken({ sub: user.id, role: user.role, handle: user.handle }),
+    recordLoginAttempt({ email, ip, userAgent, userId: user.id }, true),
+    db.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: refresh.hash,
+        userAgent: userAgent ?? undefined,
+        ip,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SEC * 1000),
+      },
+    }),
+  ]);
 
   const res = jsonOk({
     access_token: accessToken,

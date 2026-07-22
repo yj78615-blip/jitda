@@ -101,7 +101,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error(data.error?.message ?? '로그인에 실패했습니다.');
     setStoredToken(data.access_token!);
     setUser(data.user ?? null);
-    router.refresh();
   }, [router]);
 
   const signup = useCallback(async (body: { email: string; password: string; display_name: string; handle: string }) => {

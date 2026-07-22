@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 
@@ -9,7 +9,9 @@ type Tab = 'login' | 'signup';
 
 export default function AuthPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, signup } = useAuth();
+  const redirectTo = searchParams.get('redirect') || '/';
   const [tab, setTab] = useState<Tab>('login');
   const [form, setForm] = useState({ email: '', password: '', name: '', handle: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
@@ -36,8 +38,8 @@ export default function AuthPage() {
       } else {
         await login(form.email, form.password);
       }
-      router.push('/');
-      router.refresh();
+      // hard navigation — ensures middleware sees refresh cookie
+      window.location.href = redirectTo;
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
       setLoading(false);

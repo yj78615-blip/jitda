@@ -125,10 +125,6 @@ export default async function Home({
             <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input type="search" placeholder="작품 · 작가 · 태그 검색" aria-label="검색" />
           </div>
-          <nav className="user-nav">
-            <Link className="btn btn-ghost" href="/auth">로그인</Link>
-            <Link className="btn btn-primary" href="/studio">스튜디오</Link>
-          </nav>
         </div>
       </header>
 

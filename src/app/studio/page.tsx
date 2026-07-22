@@ -1,233 +1,476 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth, type AuthUser } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 
+/* ---------- types ---------- */
 interface SeriesItem {
-  id: string;
-  title: string;
-  status: string;
-  episodeCount: number;
-  views: number;
-  likes: number;
-  updatedAt: string;
+  id: string; title: string; status: string; episode_count: number;
+  description?: string | null; genres?: string[];
+  stats: { views_total: number; likes_total: number; subscribers_only_count: number };
+  updated_at: string; created_at: string;
 }
+interface SeriesListResp { items: SeriesItem[] }
 
-interface StudioStats {
-  totalViews: number;
-  subscriberCount: number;
-  totalRevenue: number;
-  totalLikes: number;
-}
+type Section = 'dashboard' | 'works' | 'upload' | 'payouts' | 'settings';
+type WorksTab = 'series' | 'posts';
 
-function fmt(n: number): string {
+/* ---------- helpers ---------- */
+const fmtNum = (n: number): string => {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
   return String(n);
-}
+};
+const fmtKRW = (n: number): string => n.toLocaleString('ko-KR');
+
+const relTime = (iso: string): string => {
+  const min = Math.max(0, (Date.now() - new Date(iso).getTime()) / 60_000);
+  if (min < 60) return `${Math.floor(min)}분 전`;
+  if (min < 60 * 24) return `${Math.floor(min / 60)}시간 전`;
+  if (min < 60 * 24 * 7) return `${Math.floor(min / 60 / 24)}일 전`;
+  return `${Math.floor(min / 60 / 24 / 7)}주 전`;
+};
+
+const INITIALS = (name?: string | null): string =>
+  (name || '?').charAt(0).toUpperCase();
+
+const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
+  { key: 'dashboard', label: '대시보드', icon: 'M3 3h7v9H3zm11 0h7v5h-7zm0 9h7v9h-7zM3 16h7v5H3z' },
+  { key: 'works', label: '작품 관리', icon: 'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zm20 0h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z' },
+  { key: 'upload', label: '업로드', icon: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m17-7-5-5-5 5m5-5v12' },
+  { key: 'payouts', label: '정산', icon: 'M2 5h20v14H2zm0 5h20' },
+  { key: 'settings', label: '설정', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-9-3h2m14 0h2M5.64 5.64l1.41 1.41m9.9 9.9 1.41 1.41M4.22 16.78l1.42-1.42m12.72-12.72 1.42 1.42' },
+];
+
+/* ================================================================
+   Component
+   ================================================================ */
 
 export default function StudioPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<'overview' | 'series' | 'analytics'>('overview');
-  const [showUpload, setShowUpload] = useState(false);
+  const [section, setSection] = useState<Section>('dashboard');
+  const [worksTab, setWorksTab] = useState<WorksTab>('series');
   const [series, setSeries] = useState<SeriesItem[]>([]);
-  const [stats, setStats] = useState<StudioStats | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  const fetchSeries = useCallback(async (uid: string) => {
+    try {
+      const r = await fetch(`/api/v1/series?author_id=${uid}`);
+      if (r.ok) {
+        const d: SeriesListResp = await r.json();
+        setSeries(d.items ?? []);
+      }
+    } catch { /* empty fallback */ }
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      router.push('/auth?redirect=/studio');
-      return;
-    }
+    if (!user) { router.push('/auth?redirect=/studio'); return; }
+    setLoading(true);
+    fetchSeries(user.id).finally(() => setLoading(false));
+  }, [user, authLoading, router, fetchSeries]);
 
-    const fetchData = async () => {
-      try {
-        const [seriesRes, statsRes] = await Promise.all([
-          fetch('/api/v1/series?authorId=' + user.id),
-          fetch('/api/v1/users/' + user.id + '/stats'),
-        ]);
-
-        if (seriesRes.ok) {
-          const data = await seriesRes.json();
-          setSeries(data.series ?? data ?? []);
-        }
-        if (statsRes.ok) {
-          const data = await statsRes.json();
-          setStats(data);
-        }
-      } catch {
-        // fallback — show empty state
-      } finally {
-        setDataLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [user, authLoading, router]);
+  // ⚠️ all hooks must live ABOVE the conditional return (Rules of Hooks)
+  const totalViews = series.reduce((s, i) => s + i.stats.views_total, 0);
+  const totalLikes = series.reduce((s, i) => s + i.stats.likes_total, 0);
+  const topSeries = useMemo(() =>
+    [...series].sort((a, b) => b.stats.views_total - a.stats.views_total).slice(0, 5),
+    [series]
+  );
 
   if (authLoading) {
     return (
-      <div className="app studio-page">
+      <div className="studio-page">
         <div className="studio-loading"><span className="spinner" /></div>
       </div>
     );
   }
 
   return (
-    <div className="app studio-page">
-      <header className="studio-header">
-        <div className="container">
-          <div className="studio-header-left">
-            <Link href="/" className="brand">
-              <span className="brand-mark">IF</span>
-            </Link>
-            <span className="studio-badge">STUDIO</span>
-          </div>
-          <nav className="studio-nav">
-            <Link href="/" className="btn btn-ghost">홈으로</Link>
-            <button className="btn btn-primary" onClick={() => setShowUpload(true)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-              새 작품
-            </button>
-          </nav>
+    <div className="studio-page">
+      {/* Sidebar */}
+      <aside className="studio-sidebar">
+        <div className="studio-sidebar-head">
+          <Link href="/" className="brand">
+            <span className="brand-mark">IF</span>
+          </Link>
         </div>
-      </header>
+        <div className="studio-nav-section">Author</div>
+        <nav className="studio-nav">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              className={`studio-nav-item${section === item.key ? ' active' : ''}`}
+              onClick={() => setSection(item.key)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round">
+                <path d={item.icon} />
+              </svg>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="studio-sidebar-foot">
+          <div className="studio-me-card">
+            <div className="studio-me-avatar">{INITIALS(user?.display_name)}</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="studio-me-name">{user?.display_name || '—'}</div>
+              <div className="studio-me-handle">@{user?.handle || '—'}</div>
+            </div>
+          </div>
+          <Link href="/" className="studio-out-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            </svg>
+            IF 사이트로
+          </Link>
+        </div>
+      </aside>
 
+      {/* Main */}
       <main className="studio-main">
-        <div className="container">
-          <div className="studio-tabs" role="tablist">
-            <button className={`studio-tab ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')} role="tab">개요</button>
-            <button className={`studio-tab ${tab === 'series' ? 'active' : ''}`} onClick={() => setTab('series')} role="tab">작품 관리</button>
-            <button className={`studio-tab ${tab === 'analytics' ? 'active' : ''}`} onClick={() => setTab('analytics')} role="tab">분석</button>
+        {section === 'dashboard' && (
+          <DashboardSection
+            series={series}
+            totalViews={totalViews}
+            totalLikes={totalLikes}
+            topSeries={topSeries}
+            loading={loading}
+            onNav={setSection}
+          />
+        )}
+        {section === 'works' && (
+          <WorksSection
+            series={series}
+            tab={worksTab}
+            onTabChange={setWorksTab}
+            loading={loading}
+            onNav={setSection}
+          />
+        )}
+        {section === 'upload' && <UploadSection />}
+        {section === 'payouts' && <PayoutsSection />}
+        {section === 'settings' && <SettingsSection user={user} />}
+      </main>
+    </div>
+  );
+}
+
+/* ================================================================
+   Dashboard
+   ================================================================ */
+
+function DashboardSection({
+  series, totalViews, totalLikes, topSeries, loading, onNav,
+}: {
+  series: SeriesItem[]; totalViews: number; totalLikes: number;
+  topSeries: SeriesItem[]; loading: boolean; onNav: (s: Section) => void;
+}) {
+  return (
+    <>
+      <div className="studio-page-head">
+        <div>
+          <h1 className="studio-page-title">대시보드</h1>
+          <div className="studio-page-sub">이번 달 활동을 한눈에</div>
+        </div>
+        <div className="studio-page-actions">
+          <button className="btn btn-ghost" onClick={() => onNav('works')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
+            작품 관리
+          </button>
+          <button className="btn studio-btn-accent" onClick={() => onNav('upload')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            새 회차 · 포스트
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="studio-loading"><span className="spinner" /></div>
+      ) : (
+        <>
+          <div className="studio-kpi-grid">
+            <div className="studio-kpi">
+              <div className="studio-kpi-label">
+                <span>총 조회수</span>
+                <span className="studio-kpi-delta neutral">전체</span>
+              </div>
+              <div className="studio-kpi-value">{fmtNum(totalViews)}</div>
+            </div>
+            <div className="studio-kpi">
+              <div className="studio-kpi-label"><span>작품 수</span></div>
+              <div className="studio-kpi-value">{series.length}</div>
+              <div className="studio-kpi-note">
+                {series.filter((s) => s.status === 'ONGOING').length}개 연재중
+              </div>
+            </div>
+            <div className="studio-kpi">
+              <div className="studio-kpi-label"><span>좋아요</span></div>
+              <div className="studio-kpi-value">{fmtNum(totalLikes)}</div>
+            </div>
+            <div className="studio-kpi accent">
+              <div className="studio-kpi-label"><span>예상 정산액</span></div>
+              <div className="studio-kpi-value money">{series.length > 0 ? fmtKRW(totalViews) : '0'}</div>
+              <div className="studio-kpi-note">준비 중 · 수익 모델 도입 예정</div>
+            </div>
           </div>
 
-          {tab === 'overview' && (
-            <>
-              <div className="studio-stats">
-                <div className="studio-stat-card">
-                  <div className="studio-stat-label">총 조회수</div>
-                  <div className="studio-stat-value">{stats ? fmt(stats.totalViews) : '—'}</div>
-                </div>
-                <div className="studio-stat-card">
-                  <div className="studio-stat-label">구독자</div>
-                  <div className="studio-stat-value">{stats ? fmt(stats.subscriberCount) : '—'}</div>
-                </div>
-                <div className="studio-stat-card">
-                  <div className="studio-stat-label">총 수익</div>
-                  <div className="studio-stat-value">{stats ? '₩' + fmt(stats.totalRevenue) : '—'}</div>
-                </div>
-                <div className="studio-stat-card">
-                  <div className="studio-stat-label">좋아요</div>
-                  <div className="studio-stat-value">{stats ? fmt(stats.totalLikes) : '—'}</div>
-                </div>
+          <div className="studio-col-2">
+            <div className="studio-card">
+              <div className="studio-card-head">
+                <h2 className="studio-card-title">내 작품<span className="count">{series.length}</span></h2>
+                <button className="studio-card-link" onClick={() => onNav('works')}>전체 보기 →</button>
               </div>
-
-              <section className="studio-section">
-                <h2 className="studio-section-title">내 작품</h2>
-                {dataLoading ? (
-                  <div className="studio-loading"><span className="spinner" /></div>
-                ) : series.length === 0 ? (
-                  <div className="studio-empty">
-                    <p>아직 작품이 없습니다. 첫 작품을 업로드해보세요!</p>
-                  </div>
-                ) : (
-                  <div className="studio-activity">
-                    {series.map((s) => (
-                      <div key={s.id} className="studio-activity-item">
-                        <div className="studio-activity-icon">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        </div>
-                        <div className="studio-activity-info">
-                          <div className="studio-activity-title">{s.title}</div>
-                          <div className="studio-activity-meta">{s.episodeCount}화 · {s.updatedAt}</div>
-                        </div>
-                        <span className={`studio-activity-status status-${s.status === 'COMPLETED' ? 'end' : 'ongoing'}`}>
-                          {s.status === 'COMPLETED' ? '완결' : '연재중'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-
-          {tab === 'series' && (
-            <section className="studio-section">
-              <div className="studio-section-head">
-                <h2 className="studio-section-title">내 작품</h2>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowUpload(true)}>+ 새 작품</button>
-              </div>
-              {dataLoading ? (
-                <div className="studio-loading"><span className="spinner" /></div>
-              ) : series.length === 0 ? (
-                <div className="studio-empty"><p>아직 작품이 없습니다.</p></div>
+              {series.length === 0 ? (
+                <div className="studio-empty">아직 작품이 없어요. 업로드에서 시작해보세요.</div>
               ) : (
-                <div className="studio-table-wrap">
-                  <table className="studio-table">
-                    <thead>
-                      <tr>
-                        <th>제목</th>
-                        <th>상태</th>
-                        <th>화수</th>
-                        <th>조회</th>
-                        <th>좋아요</th>
-                        <th>최종 업데이트</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {series.map((s) => (
-                        <tr key={s.id}>
-                          <td className="studio-table-title">
-                            <Link href={`/series/${s.id}`}>{s.title}</Link>
-                          </td>
-                          <td>
-                            <span className={`studio-badge-sm ${s.status === 'COMPLETED' ? 'badge-end' : 'badge-ongoing'}`}>
-                              {s.status === 'COMPLETED' ? '완결' : '연재중'}
-                            </span>
-                          </td>
-                          <td>{s.episodeCount}화</td>
-                          <td>{fmt(s.views)}</td>
-                          <td>{fmt(s.likes)}</td>
-                          <td className="studio-table-muted">{s.updatedAt}</td>
-                          <td><button className="btn btn-ghost btn-sm">관리</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="studio-top-list">
+                  {series.slice(0, 5).map((s, i) => (
+                    <div key={s.id} className="studio-top-item">
+                      <div className="studio-top-rank">{i + 1}</div>
+                      <div className="studio-top-thumb" />
+                      <div className="studio-top-body">
+                        <div className="studio-top-line1">{s.title}</div>
+                        <div className="studio-top-line2">{fmtNum(s.stats.views_total)} 조회</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
-            </section>
-          )}
+            </div>
 
-          {tab === 'analytics' && (
-            <section className="studio-section">
-              <h2 className="studio-section-title">조회수 추이</h2>
-              <div className="studio-chart-placeholder">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="studio-chart-icon">
-                  <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3" strokeWidth="2"/>
-                </svg>
-                <p>데이터를 불러오는 중...</p>
+            <div className="studio-card">
+              <div className="studio-card-head">
+                <h2 className="studio-card-title">최근 활동</h2>
               </div>
-            </section>
-          )}
-        </div>
-      </main>
+              {series.length === 0 ? (
+                <div className="studio-empty">활동 내역이 없어요.</div>
+              ) : (
+                <div className="studio-tip-list">
+                  {topSeries.slice(0, 4).map((s) => (
+                    <div key={s.id} className="studio-tip-item">
+                      <div className="studio-tip-avatar">{INITIALS(s.title)}</div>
+                      <div className="studio-tip-body">
+                        <div className="studio-tip-hd">
+                          <span className="studio-tip-name">{s.title}</span>
+                          <span className="studio-tip-time">{relTime(s.updated_at)}</span>
+                        </div>
+                        <div className="studio-tip-msg">
+                          {s.status === 'COMPLETED' ? '완결' : '연재중'} · {s.episode_count}화
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
 
-      {showUpload && (
-        <div className="studio-modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="studio-modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="studio-modal-title">새 작품 만들기</h2>
-            <p className="studio-modal-desc">아직 준비 중인 기능입니다.</p>
-            <button className="btn btn-primary" onClick={() => setShowUpload(false)}>확인</button>
+/* ================================================================
+   Works
+   ================================================================ */
+
+function WorksSection({
+  series, tab, onTabChange, loading, onNav,
+}: {
+  series: SeriesItem[]; tab: WorksTab; onTabChange: (t: WorksTab) => void;
+  loading: boolean; onNav: (s: Section) => void;
+}) {
+  return (
+    <>
+      <div className="studio-page-head">
+        <div>
+          <h1 className="studio-page-title">작품 관리</h1>
+          <div className="studio-page-sub">
+            시리즈 {series.length}개{/* · 포스트 0개 */}
           </div>
         </div>
+        <div className="studio-page-actions">
+          <button className="btn studio-btn-accent" onClick={() => onNav('upload')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            새로 만들기
+          </button>
+        </div>
+      </div>
+
+      <div className="studio-works-tabs">
+        <button
+          className={`studio-works-tab${tab === 'series' ? ' active' : ''}`}
+          onClick={() => onTabChange('series')}
+        >
+          시리즈
+        </button>
+        <button
+          className={`studio-works-tab${tab === 'posts' ? ' active' : ''}`}
+          onClick={() => onTabChange('posts')}
+        >
+          개별 포스트
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="studio-loading"><span className="spinner" /></div>
+      ) : tab === 'series' ? (
+        series.length === 0 ? (
+          <div className="studio-empty">아직 시리즈가 없어요. 업로드에서 시작해보세요.</div>
+        ) : (
+          <div className="studio-table-wrap">
+            <table className="studio-table">
+              <thead>
+                <tr>
+                  <th>작품</th>
+                  <th>상태</th>
+                  <th className="num">회차</th>
+                  <th className="num">총 조회수</th>
+                  <th className="num">좋아요</th>
+                  <th>업데이트</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {series.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <div className="studio-table-title-cell">
+                        <div className="studio-table-thumb" />
+                        <div>
+                          <Link href={`/series/${s.id}`} className="studio-table-title">{s.title}</Link>
+                          <div className="studio-table-sub">{s.genres?.[0] || '기타'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`studio-status-pill ${s.status === 'COMPLETED' ? 'completed' : 'ongoing'}`}>
+                        {s.status === 'COMPLETED' ? '완결' : '연재중'}
+                      </span>
+                    </td>
+                    <td className="num">{s.episode_count}</td>
+                    <td className="num">{fmtNum(s.stats.views_total)}</td>
+                    <td className="num">{fmtNum(s.stats.likes_total)}</td>
+                    <td>{relTime(s.updated_at)}</td>
+                    <td>
+                      <div className="studio-row-actions">
+                        <button className="studio-row-btn">편집</button>
+                        <button className="studio-row-btn">+ 새 회차</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        <div className="studio-empty">개별 포스트 기능은 준비 중입니다.</div>
       )}
-    </div>
+    </>
+  );
+}
+
+/* ================================================================
+   Upload
+   ================================================================ */
+
+function UploadSection() {
+  return (
+    <>
+      <div className="studio-page-head">
+        <div>
+          <h1 className="studio-page-title">업로드</h1>
+          <div className="studio-page-sub">새 회차 또는 개별 포스트 업로드</div>
+        </div>
+      </div>
+      <div className="studio-card" style={{ padding: '60px 24px', textAlign: 'center' }}>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)"
+          strokeWidth="1.5" style={{ margin: '0 auto 12px', display: 'block' }}>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>업로드 기능 준비 중</h3>
+        <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 360, margin: '0 auto' }}>
+          이미지 업로드, 에피소드 편집, 포스트 작성 기능이 곧 추가됩니다.
+        </p>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================
+   Payouts
+   ================================================================ */
+
+function PayoutsSection() {
+  return (
+    <>
+      <div className="studio-page-head">
+        <div>
+          <h1 className="studio-page-title">정산</h1>
+          <div className="studio-page-sub">수익 현황 및 정산 내역</div>
+        </div>
+      </div>
+      <div className="studio-card" style={{ padding: '60px 24px', textAlign: 'center' }}>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)"
+          strokeWidth="1.5" style={{ margin: '0 auto 12px', display: 'block' }}>
+          <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
+        </svg>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>정산 기능 준비 중</h3>
+        <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 360, margin: '0 auto' }}>
+          수익 모델 도입 후 정산 내역을 확인할 수 있습니다.
+        </p>
+      </div>
+    </>
+  );
+}
+
+/* ================================================================
+   Settings
+   ================================================================ */
+
+function SettingsSection({ user }: { user: AuthUser | null }) {
+  return (
+    <>
+      <div className="studio-page-head">
+        <div>
+          <h1 className="studio-page-title">설정</h1>
+          <div className="studio-page-sub">프로필 및 작가 계정 설정</div>
+        </div>
+      </div>
+
+      <div className="studio-card" style={{ marginBottom: 16 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>프로필</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label className="studio-kpi-label" style={{ marginBottom: 4 }}>표시 이름</label>
+            <div className="studio-table-title">{user?.display_name || '—'}</div>
+          </div>
+          <div>
+            <label className="studio-kpi-label" style={{ marginBottom: 4 }}>핸들</label>
+            <div className="studio-table-title">@{user?.handle || '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="studio-card" style={{ padding: '60px 24px', textAlign: 'center' }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+          추가 설정은 준비 중입니다
+        </h3>
+        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+          알림 · 정산 계좌 · 작가 프로필 설정이 곧 추가됩니다.
+        </p>
+      </div>
+    </>
   );
 }

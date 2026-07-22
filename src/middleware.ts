@@ -8,6 +8,15 @@ const PROTECTED_ROUTES = ['/studio', '/settings'];
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // Rewrite /@handle → /profile?handle=handle (query param, no dynamic route)
+  const atMatch = pathname.match(/^\/@(.+)/);
+  if (atMatch && atMatch[1]) {
+    const handle = atMatch[1];
+    const url = new URL(`/profile`, req.url);
+    url.searchParams.set('handle', handle);
+    return NextResponse.rewrite(url);
+  }
+
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(route + '/')
   );
@@ -25,5 +34,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/studio/:path*', '/settings/:path*'],
+  matcher: ['/studio/:path*', '/settings/:path*', '/((?!api|_next|favicon).*)'],
 };

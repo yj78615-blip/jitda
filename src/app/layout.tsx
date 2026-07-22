@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import './main.css';
 import { AuthProvider } from '@/lib/auth-context';
+import UserNav from '@/components/user-nav';
 
 export const metadata: Metadata = {
   title: 'IF — 웹툰 오픈 플랫폼',
@@ -15,7 +16,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body><AuthProvider>{children}</AuthProvider></body>
+      <body>
+        <AuthProvider>
+          <div className="global-user-nav"><UserNav /></div>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
