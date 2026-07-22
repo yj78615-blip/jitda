@@ -3,9 +3,11 @@
 
 function buildCSP(): string {
   const isDev = process.env.NODE_ENV !== 'production';
+  // ponytail: 'unsafe-inline' — Next.js 15 App Router가 RSC hydration을 inline <script>로 심음.
+  // 업그레이드 경로: middleware에서 nonce 생성 → next/script에 자동 주입 → CSP에 nonce-{hash}.
   const scriptSrc = isDev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com"
-    : "script-src 'self' https://js.stripe.com";
+    : "script-src 'self' 'unsafe-inline' https://js.stripe.com";
   const connectSrc = isDev
     ? "connect-src 'self' https://api.stripe.com ws: wss:"
     : "connect-src 'self' https://api.stripe.com";
