@@ -2,59 +2,94 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import Link from 'next/link';
 
-interface Episode {
+interface EpisodeDTO {
+  id: string;
+  series_id: string;
+  title: string;
+  order: number;
+  viewer_mode: 'scroll' | 'page';
+  is_subscriber_only: boolean;
+  is_adult: boolean;
+  images: { id: string; url: string | null; order: number; width: number | null; height: number | null }[];
+  stats: { views: number; likes: number; comments: number };
+  prev_episode_id: string | null;
+  next_episode_id: string | null;
+  published_at: string | null;
+  created_at: string;
+}
+
+interface EpisodeSummary {
   id: string;
   title: string;
   order: number;
-  seriesId: string;
-  seriesTitle: string;
-  publishedAt: string;
-  viewsCount: number;
-  likesCount: number;
-  panelCount: number;
+  published_at: string | null;
+  stats: { views: number; likes: number };
 }
 
-const MOCK_EPISODE: Episode = {
-  id: 'ep-001',
-  title: '첫 만남',
-  order: 1,
-  seriesId: 'series-001',
-  seriesTitle: '별이 빛나는 밤에',
-  publishedAt: '2026-07-15',
-  viewsCount: 4523,
-  likesCount: 891,
-  panelCount: 8,
-};
+interface SeriesInfo {
+  id: string;
+  title: string;
+}
 
 export default function EpisodeViewerPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const [episode] = useState<Episode>(MOCK_EPISODE);
-  const [showList, setShowList] = useState(false);
+  const { refresh: refreshAuth } = useAuth();
+  const [episode, setEpisode] = useState<EpisodeDTO | null>(null);
+  const [series, setSeries] = useState<SeriesInfo | null>(null);
+  const [episodes, setEpisodes] = useState<EpisodeSummary[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [showList, setShowList] = useState(false);
 
   useEffect(() => {
-    params.then((p) => {
-      console.log('Episode ID:', p.id);
+    params.then(async ({ id }) => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/v1/episodes/${id}`);
+        if (!res.ok) {
+          if (res.status === 401) { refreshAuth(); }
+          return;
+        }
+        const data = await res.json() as { episode: EpisodeDTO };
+        setEpisode(data.episode);
+        setCurrentPage(1);
+
+        const seriesRes = await fetch(`/api/v1/series/${data.episode.series_id}`);
+        if (seriesRes.ok) {
+          const seriesData = await seriesRes.json() as { series: SeriesInfo };
+          setSeries(seriesData.series);
+        }
+
+        const episodesRes = await fetch(`/api/v1/episodes?seriesId=${data.episode.series_id}`);
+        if (episodesRes.ok) {
+          const epsData = await episodesRes.json() as { episodes: EpisodeSummary[] };
+          setEpisodes(epsData.episodes ?? []);
+        }
+      } catch {
+        // fail silently
+      } finally {
+        setLoading(false);
+      }
     });
-  }, [params]);
+  }, [params, refreshAuth]);
 
   const handlePrev = useCallback(() => {
     if (currentPage > 1) {
-      setLoading(true);
+      setImageLoading(true);
       setCurrentPage((p) => p - 1);
-      setTimeout(() => setLoading(false), 300);
     }
   }, [currentPage]);
 
   const handleNext = useCallback(() => {
-    if (currentPage < episode.panelCount) {
-      setLoading(true);
+    if (episode && currentPage < episode.images.length) {
+      setImageLoading(true);
       setCurrentPage((p) => p + 1);
-      setTimeout(() => setLoading(false), 300);
     }
-  }, [currentPage, episode.panelCount]);
+  }, [currentPage, episode]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -66,23 +101,46 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
     return () => window.removeEventListener('keydown', handleKey);
   }, [handlePrev, handleNext]);
 
+  const handleNavigateEpisode = useCallback((episodeId: string) => {
+    setShowList(false);
+    router.push(`/episodes/${episodeId}`);
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="viewer-app">
+        <div className="viewer-loading"><span className="spinner" /></div>
+      </div>
+    );
+  }
+
+  if (!episode) {
+    return (
+      <div className="viewer-app">
+        <div className="viewer-loading">
+          <p>에피소드를 불러올 수 없습니다.</p>
+          <Link href="/" className="btn btn-ghost">홈으로</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const totalPages = episode.images.length;
+  const currentImage = episode.images[currentPage - 1];
+
   return (
     <div className="viewer-app">
       {/* Top bar */}
       <header className="viewer-header">
         <div className="viewer-header-inner">
-          <button className="viewer-back" onClick={() => router.push(`/series/${episode.seriesId}`)}>
+          <button className="viewer-back" onClick={() => router.push(`/series/${episode.series_id}`)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
           <div className="viewer-info">
-            <span className="viewer-series">{episode.seriesTitle}</span>
+            <span className="viewer-series">{series?.title ?? ''}</span>
             <span className="viewer-episode-title">{episode.order}화. {episode.title}</span>
           </div>
           <div className="viewer-actions">
-            <button className={`viewer-btn-like ${episode.likesCount > 0 ? 'liked' : ''}`} disabled>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-              <span>{episode.likesCount}</span>
-            </button>
             <button className="viewer-btn-list" onClick={() => setShowList(!showList)}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
             </button>
@@ -92,17 +150,27 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
 
       {/* Viewer content */}
       <main className="viewer-main" onClick={handleNext}>
-        <div className={`viewer-panel ${loading ? 'loading' : ''}`}>
+        <div className={`viewer-panel ${imageLoading ? 'loading' : ''}`}>
           <div className="viewer-panel-inner">
-            <div className="viewer-panel-placeholder">
-              <div className="viewer-panel-gradient" style={{
-                '--g1': '#2d1b69', '--g2': '#0d0c10',
-              } as React.CSSProperties}>
-                <span className="viewer-panel-label">{episode.seriesTitle}</span>
-                <span className="viewer-panel-sub">{episode.order}화 · {episode.title}</span>
-                <span className="viewer-panel-page">{currentPage} / {episode.panelCount}</span>
+            {currentImage?.url ? (
+              <img
+                src={currentImage.url}
+                alt={`${episode.title} - ${currentPage}페이지`}
+                className="viewer-panel-img"
+                onLoad={() => setImageLoading(false)}
+                onError={() => setImageLoading(false)}
+              />
+            ) : (
+              <div className="viewer-panel-placeholder">
+                <div className="viewer-panel-gradient" style={{
+                  '--g1': '#2d1b69', '--g2': '#0d0c10',
+                } as React.CSSProperties}>
+                  <span className="viewer-panel-label">{series?.title ?? ''}</span>
+                  <span className="viewer-panel-sub">{episode.order}화 · {episode.title}</span>
+                  <span className="viewer-panel-page">{currentPage} / {totalPages}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -111,8 +179,8 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
             이전
           </button>
-          <span className="viewer-page-indicator">{currentPage} / {episode.panelCount}</span>
-          <button className="viewer-nav-btn" onClick={(e) => { e.stopPropagation(); handleNext(); }} disabled={currentPage >= episode.panelCount}>
+          <span className="viewer-page-indicator">{currentPage} / {totalPages}</span>
+          <button className="viewer-nav-btn" onClick={(e) => { e.stopPropagation(); handleNext(); }} disabled={currentPage >= totalPages}>
             다음
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
           </button>
@@ -130,17 +198,18 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
               </button>
             </div>
             <div className="viewer-drawer-list">
-              {Array.from({ length: 5 }, (_, i) => (
-                <button key={i} className={`viewer-drawer-item ${i === 0 ? 'active' : ''}`}
-                  onClick={() => { setCurrentPage(1); setShowList(false); }}>
-                  <span className="viewer-drawer-num">{i + 1}화</span>
+              {episodes.map((ep) => (
+                <button
+                  key={ep.id}
+                  className={`viewer-drawer-item ${ep.id === episode.id ? 'active' : ''}`}
+                  onClick={() => handleNavigateEpisode(ep.id)}
+                >
+                  <span className="viewer-drawer-num">{ep.order}화</span>
                   <div className="viewer-drawer-info">
-                    <span className="viewer-drawer-title">
-                      {['첫 만남', '두근거림', '비밀', '고백', '새로운 시작'][i]}
-                    </span>
-                    <span className="viewer-drawer-meta">조회 {1234 + i * 300}</span>
+                    <span className="viewer-drawer-title">{ep.title}</span>
+                    <span className="viewer-drawer-meta">조회 {ep.stats.views}</span>
                   </div>
-                  {i === 0 && <span className="viewer-drawer-current">현재</span>}
+                  {ep.id === episode.id && <span className="viewer-drawer-current">현재</span>}
                 </button>
               ))}
             </div>
@@ -148,20 +217,34 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {/* Bottom progress bar */}
+      {/* Bottom navigation bar */}
       <footer className="viewer-footer">
         <div className="viewer-footer-inner">
-          <button className="viewer-footer-btn" onClick={handlePrev} disabled={currentPage <= 1}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
-            이전화
-          </button>
+          {episode.prev_episode_id ? (
+            <Link href={`/episodes/${episode.prev_episode_id}`} className="viewer-footer-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+              이전화
+            </Link>
+          ) : (
+            <button className="viewer-footer-btn" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+              이전화
+            </button>
+          )}
           <div className="viewer-progress">
-            <div className="viewer-progress-bar" style={{ width: `${(currentPage / episode.panelCount) * 100}%` }} />
+            <div className="viewer-progress-bar" style={{ width: `${(currentPage / totalPages) * 100}%` }} />
           </div>
-          <button className="viewer-footer-btn" onClick={handleNext} disabled={currentPage >= episode.panelCount}>
-            다음화
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
+          {episode.next_episode_id ? (
+            <Link href={`/episodes/${episode.next_episode_id}`} className="viewer-footer-btn">
+              다음화
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+            </Link>
+          ) : (
+            <button className="viewer-footer-btn" disabled>
+              다음화
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          )}
         </div>
       </footer>
     </div>

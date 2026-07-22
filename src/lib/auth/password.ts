@@ -1,11 +1,11 @@
-import { hash, verify, Algorithm } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import { createHash } from 'crypto';
 
 // 보안 명세 §3.2 — Argon2id.
 // 이 파라미터는 OWASP 2024 권장. 서버 CPU 에서 목표 시간 ~500ms.
 const HASH_OPTS = {
-  algorithm: Algorithm.Argon2id,
-  memoryCost: 19_456, // 19 MiB
+  algorithm: 2 as const, // Argon2id
+  memoryCost: 12_288, // 12 MiB
   timeCost: 2,
   parallelism: 1,
   outputLen: 32,
@@ -26,7 +26,7 @@ export async function verifyPassword(raw: string, hashed: string): Promise<boole
 // 존재하지 않는 계정에 대해서도 실 해싱과 유사한 CPU 시간을 소비.
 // 로그인 응답 시간으로 계정 존재 여부가 유출되는 걸 막는다 (§3.6 timing attack 방어).
 const DUMMY_HASH =
-  '$argon2id$v=19$m=19456,t=2,p=1$YWFhYWFhYWFhYWFhYWFhYQ$D93o2S4wIzXyIS42T1uH0YbG3ZQZbA5r7QYw3n0hOoY';
+  '$argon2id$v=19$m=12288,t=2,p=1$YWFhYWFhYWFhYWFhYWFhYQ$D93o2S4wIzXyIS42T1uH0YbG3ZQZbA5r7QYw3n0hOoY';
 export async function burnCpuLikeAVerify(raw: string): Promise<void> {
   try { await verify(DUMMY_HASH, raw, HASH_OPTS); } catch { /* noop */ }
 }

@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/navigation';
 
 interface SeriesItem {
   id: string;
@@ -13,22 +15,67 @@ interface SeriesItem {
   updatedAt: string;
 }
 
-const MOCK_SERIES: SeriesItem[] = [
-  { id: '1', title: '별이 빛나는 밤에', status: 'ONGOING', episodeCount: 12, views: 45230, likes: 3891, updatedAt: '2026-07-19' },
-  { id: '2', title: '너의 목소리', status: 'ONGOING', episodeCount: 8, views: 28100, likes: 2104, updatedAt: '2026-07-18' },
-  { id: '3', title: '서울의 봄', status: 'COMPLETED', episodeCount: 24, views: 128400, likes: 15200, updatedAt: '2026-06-30' },
-];
+interface StudioStats {
+  totalViews: number;
+  subscriberCount: number;
+  totalRevenue: number;
+  totalLikes: number;
+}
 
-const STATS = [
-  { label: '총 조회수', value: '201.7k', change: '+12%', positive: true },
-  { label: '구독자', value: '3,482', change: '+8%', positive: true },
-  { label: '총 수익', value: '₩1,420,000', change: '+15%', positive: true },
-  { label: '좋아요', value: '21,195', change: '+5%', positive: true },
-];
+function fmt(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(n);
+}
 
 export default function StudioPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [tab, setTab] = useState<'overview' | 'series' | 'analytics'>('overview');
   const [showUpload, setShowUpload] = useState(false);
+  const [series, setSeries] = useState<SeriesItem[]>([]);
+  const [stats, setStats] = useState<StudioStats | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/auth?redirect=/studio');
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        const [seriesRes, statsRes] = await Promise.all([
+          fetch('/api/v1/series?authorId=' + user.id),
+          fetch('/api/v1/users/' + user.id + '/stats'),
+        ]);
+
+        if (seriesRes.ok) {
+          const data = await seriesRes.json();
+          setSeries(data.series ?? data ?? []);
+        }
+        if (statsRes.ok) {
+          const data = await statsRes.json();
+          setStats(data);
+        }
+      } catch {
+        // fallback — show empty state
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, authLoading, router]);
+
+  if (authLoading) {
+    return (
+      <div className="app studio-page">
+        <div className="studio-loading"><span className="spinner" /></div>
+      </div>
+    );
+  }
 
   return (
     <div className="app studio-page">
@@ -37,7 +84,6 @@ export default function StudioPage() {
           <div className="studio-header-left">
             <Link href="/" className="brand">
               <span className="brand-mark">IF</span>
-              
             </Link>
             <span className="studio-badge">STUDIO</span>
           </div>
@@ -62,40 +108,50 @@ export default function StudioPage() {
           {tab === 'overview' && (
             <>
               <div className="studio-stats">
-                {STATS.map((s) => (
-                  <div key={s.label} className="studio-stat-card">
-                    <div className="studio-stat-label">{s.label}</div>
-                    <div className="studio-stat-value">{s.value}</div>
-                    <div className={`studio-stat-change ${s.positive ? 'up' : 'down'}`}>
-                      {s.change}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        {s.positive ? <path d="M18 15L12 9L6 15"/> : <path d="M6 9L12 15L18 9"/>}
-                      </svg>
-                    </div>
-                  </div>
-                ))}
+                <div className="studio-stat-card">
+                  <div className="studio-stat-label">총 조회수</div>
+                  <div className="studio-stat-value">{stats ? fmt(stats.totalViews) : '—'}</div>
+                </div>
+                <div className="studio-stat-card">
+                  <div className="studio-stat-label">구독자</div>
+                  <div className="studio-stat-value">{stats ? fmt(stats.subscriberCount) : '—'}</div>
+                </div>
+                <div className="studio-stat-card">
+                  <div className="studio-stat-label">총 수익</div>
+                  <div className="studio-stat-value">{stats ? '₩' + fmt(stats.totalRevenue) : '—'}</div>
+                </div>
+                <div className="studio-stat-card">
+                  <div className="studio-stat-label">좋아요</div>
+                  <div className="studio-stat-value">{stats ? fmt(stats.totalLikes) : '—'}</div>
+                </div>
               </div>
 
               <section className="studio-section">
-                <h2 className="studio-section-title">최근 업로드</h2>
-                <div className="studio-activity">
-                  {MOCK_SERIES.slice(0, 3).map((s) => (
-                    <div key={s.id} className="studio-activity-item">
-                      <div className="studio-activity-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                      </div>
-                      <div className="studio-activity-info">
-                        <div className="studio-activity-title">{s.title}</div>
-                        <div className="studio-activity-meta">
-                          {s.episodeCount}화 · {s.updatedAt}
+                <h2 className="studio-section-title">내 작품</h2>
+                {dataLoading ? (
+                  <div className="studio-loading"><span className="spinner" /></div>
+                ) : series.length === 0 ? (
+                  <div className="studio-empty">
+                    <p>아직 작품이 없습니다. 첫 작품을 업로드해보세요!</p>
+                  </div>
+                ) : (
+                  <div className="studio-activity">
+                    {series.map((s) => (
+                      <div key={s.id} className="studio-activity-item">
+                        <div className="studio-activity-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         </div>
+                        <div className="studio-activity-info">
+                          <div className="studio-activity-title">{s.title}</div>
+                          <div className="studio-activity-meta">{s.episodeCount}화 · {s.updatedAt}</div>
+                        </div>
+                        <span className={`studio-activity-status status-${s.status === 'COMPLETED' ? 'end' : 'ongoing'}`}>
+                          {s.status === 'COMPLETED' ? '완결' : '연재중'}
+                        </span>
                       </div>
-                      <span className={`studio-activity-status status-${s.status === 'COMPLETED' ? 'end' : 'ongoing'}`}>
-                        {s.status === 'COMPLETED' ? '완결' : '연재중'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </section>
             </>
           )}
@@ -106,42 +162,46 @@ export default function StudioPage() {
                 <h2 className="studio-section-title">내 작품</h2>
                 <button className="btn btn-primary btn-sm" onClick={() => setShowUpload(true)}>+ 새 작품</button>
               </div>
-              <div className="studio-table-wrap">
-                <table className="studio-table">
-                  <thead>
-                    <tr>
-                      <th>제목</th>
-                      <th>상태</th>
-                      <th>화수</th>
-                      <th>조회</th>
-                      <th>좋아요</th>
-                      <th>최종 업데이트</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {MOCK_SERIES.map((s) => (
-                      <tr key={s.id}>
-                        <td className="studio-table-title">
-                          <Link href={`/series/${s.id}`}>{s.title}</Link>
-                        </td>
-                        <td>
-                          <span className={`studio-badge-sm ${s.status === 'COMPLETED' ? 'badge-end' : 'badge-ongoing'}`}>
-                            {s.status === 'COMPLETED' ? '완결' : '연재중'}
-                          </span>
-                        </td>
-                        <td>{s.episodeCount}화</td>
-                        <td>{fmt(s.views)}</td>
-                        <td>{fmt(s.likes)}</td>
-                        <td className="studio-table-muted">{s.updatedAt}</td>
-                        <td>
-                          <button className="btn btn-ghost btn-sm">관리</button>
-                        </td>
+              {dataLoading ? (
+                <div className="studio-loading"><span className="spinner" /></div>
+              ) : series.length === 0 ? (
+                <div className="studio-empty"><p>아직 작품이 없습니다.</p></div>
+              ) : (
+                <div className="studio-table-wrap">
+                  <table className="studio-table">
+                    <thead>
+                      <tr>
+                        <th>제목</th>
+                        <th>상태</th>
+                        <th>화수</th>
+                        <th>조회</th>
+                        <th>좋아요</th>
+                        <th>최종 업데이트</th>
+                        <th></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {series.map((s) => (
+                        <tr key={s.id}>
+                          <td className="studio-table-title">
+                            <Link href={`/series/${s.id}`}>{s.title}</Link>
+                          </td>
+                          <td>
+                            <span className={`studio-badge-sm ${s.status === 'COMPLETED' ? 'badge-end' : 'badge-ongoing'}`}>
+                              {s.status === 'COMPLETED' ? '완결' : '연재중'}
+                            </span>
+                          </td>
+                          <td>{s.episodeCount}화</td>
+                          <td>{fmt(s.views)}</td>
+                          <td>{fmt(s.likes)}</td>
+                          <td className="studio-table-muted">{s.updatedAt}</td>
+                          <td><button className="btn btn-ghost btn-sm">관리</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           )}
 
@@ -170,10 +230,4 @@ export default function StudioPage() {
       )}
     </div>
   );
-}
-
-function fmt(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
-  return String(n);
 }

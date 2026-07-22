@@ -126,8 +126,8 @@ export default async function Home({
             <input type="search" placeholder="작품 · 작가 · 태그 검색" aria-label="검색" />
           </div>
           <nav className="user-nav">
-            <Link className="btn btn-ghost" href="/api/v1/auth/me">로그인</Link>
-            <Link className="btn btn-primary" href="/portal.html">작가로 시작</Link>
+            <Link className="btn btn-ghost" href="/auth">로그인</Link>
+            <Link className="btn btn-primary" href="/studio">스튜디오</Link>
           </nav>
         </div>
       </header>
@@ -189,9 +189,9 @@ export default async function Home({
         <div className="container">
           <div>© 2026 IF · <span style={{ color: 'var(--accent)', fontWeight: 600 }}>LIVE</span></div>
           <div className="footer-links">
-            <Link href="/portal.html">전체 목업</Link>
-            <Link href="/specs/prd.html">PRD</Link>
-            <Link href="/specs/api.html">API</Link>
+            <Link href="/search">검색</Link>
+            <Link href="/studio">스튜디오</Link>
+            <Link href="/auth">로그인</Link>
           </div>
         </div>
       </footer>
@@ -216,7 +216,7 @@ function SeriesRankCard({ s, rank }: { s: SeriesRow; rank: number }) {
   const genreName = genre ? GENRE_NAME_KO[genre] ?? genre : '기타';
   const badge = s.status === 'COMPLETED' ? <span className="badge badge-end">완결</span> : null;
   return (
-    <Link className="rank-card" href={`/mockups/viewer.html`} style={{ ['--g1' as string]: g1, ['--g2' as string]: g2 } as React.CSSProperties}>
+    <Link className="rank-card" href={`/series/${s.id}`} style={{ ['--g1' as string]: g1, ['--g2' as string]: g2 } as React.CSSProperties}>
       <div className="thumb">
         <span className="rank-num">{String(rank).padStart(2, '0')}</span>
         {badge}
@@ -276,7 +276,7 @@ function LatestCard({ s }: { s: LatestRow }) {
   const isNew = !latestEp || latestEp.order <= 3;
   const publishedAt = latestEp?.publishedAt ?? s.updatedAt;
   return (
-    <Link className="feature-card" href={`/mockups/viewer.html`} style={{ ['--g1' as string]: g1, ['--g2' as string]: g2 } as React.CSSProperties}>
+    <Link className="feature-card" href={`/series/${s.id}`} style={{ ['--g1' as string]: g1, ['--g2' as string]: g2 } as React.CSSProperties}>
       <div className="thumb">
         <span className="feature-tag">{isNew ? '신작' : '업데이트'}</span>
         <span className="feature-time">{relTime(publishedAt)}</span>

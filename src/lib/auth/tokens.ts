@@ -18,7 +18,7 @@ export const REFRESH_TOKEN_TTL_SEC = 60 * 60 * 24 * 30;      // 30일
 
 export interface AccessTokenClaims {
   sub: string;         // user id
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'CREATOR' | 'ADMIN';
   handle: string;
 }
 

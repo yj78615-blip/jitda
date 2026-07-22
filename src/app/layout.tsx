@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './main.css';
+import { AuthProvider } from '@/lib/auth-context';
 
 export const metadata: Metadata = {
   title: 'IF — 웹툰 오픈 플랫폼',
@@ -14,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body><AuthProvider>{children}</AuthProvider></body>
     </html>
   );
 }

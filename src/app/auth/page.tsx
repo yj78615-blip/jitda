@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth-context';
 
 type Tab = 'login' | 'signup';
 
 export default function AuthPage() {
   const router = useRouter();
+  const { login, signup } = useAuth();
   const [tab, setTab] = useState<Tab>('login');
   const [form, setForm] = useState({ email: '', password: '', name: '', handle: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
@@ -25,34 +27,19 @@ export default function AuthPage() {
           setLoading(false);
           return;
         }
-        const res = await fetch('/api/v1/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: form.email, password: form.password, display_name: form.name, handle: form.handle }),
+        await signup({
+          email: form.email,
+          password: form.password,
+          display_name: form.name,
+          handle: form.handle,
         });
-        if (!res.ok) {
-          const data = await res.json();
-          setError(data.error?.message ?? '회원가입에 실패했습니다.');
-          setLoading(false);
-          return;
-        }
       } else {
-        const res = await fetch('/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: form.email, password: form.password }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          setError(data.error?.message ?? '로그인에 실패했습니다.');
-          setLoading(false);
-          return;
-        }
+        await login(form.email, form.password);
       }
       router.push('/');
       router.refresh();
-    } catch {
-      setError('네트워크 오류가 발생했습니다.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다.');
       setLoading(false);
     }
   };
@@ -102,11 +89,11 @@ export default function AuthPage() {
                   />
                 </div>
                 <div className="auth-field">
-                  <label htmlFor="handle">핸들 (/@)</label>
+                  <label htmlFor="handle">URL 프로필 주소</label>
                   <input
                     id="handle"
                     type="text"
-                    placeholder="lowercase 소문자 · 숫자 · _"
+                    placeholder="if.kr/@myprofile"
                     value={form.handle}
                     onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
                     required
@@ -184,9 +171,9 @@ export default function AuthPage() {
               <svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
               Google로 계속
             </button>
-            <button className="auth-social-btn kakao" disabled>
-              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 5.73 2 10.33c0 2.83 1.83 5.28 4.58 6.75l-1.16 4.08c-.1.35.3.62.58.41l4.88-3.2c.38.05.76.08 1.12.08 5.52 0 10-3.73 10-8.33S17.52 2 12 2z"/></svg>
-              카카오로 계속
+            <button className="auth-social-btn naver" disabled>
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="#03C75A" d="M16.273 12.845 7.727 3.818H3.818v16.364h3.909V8.127l8.546 9.027h3.909V3.818h-3.909z"/></svg>
+              네이버로 계속
             </button>
           </div>
 

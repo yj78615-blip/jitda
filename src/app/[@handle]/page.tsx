@@ -2,6 +2,23 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 
+interface AuthorWithSeries {
+  handle: string;
+  displayName: string;
+  avatarImageId: string | null;
+  bio: string | null;
+  series: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    viewsTotal: number;
+    likesTotal: number;
+    tags: Array<{ tag: { slug: string; nameKo: string; isGenre: boolean } }>;
+    _count: { episodes: number };
+  }>;
+}
+
 export default async function AuthorPage({
   params,
 }: {
@@ -9,12 +26,12 @@ export default async function AuthorPage({
 }) {
   const { handle } = await params;
 
-  const author = await db.user.findUnique({
+  const author = (await db.user.findUnique({
     where: { handle, deletedAt: null, role: { in: ['CREATOR', 'ADMIN'] } },
     select: {
       handle: true,
       displayName: true,
-      avatarUrl: true,
+      avatarImageId: true,
       bio: true,
       series: {
         where: { deletedAt: null },
@@ -27,13 +44,13 @@ export default async function AuthorPage({
           viewsTotal: true,
           likesTotal: true,
           tags: {
-            include: { tag: { select: { slug: true, name: true, isGenre: true } } },
+            include: { tag: { select: { slug: true, nameKo: true, isGenre: true } } },
           },
           _count: { select: { episodes: true } },
         },
       },
     },
-  });
+  })) as unknown as AuthorWithSeries | null;
 
   if (!author) notFound();
 

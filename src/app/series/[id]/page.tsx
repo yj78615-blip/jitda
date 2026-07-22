@@ -12,21 +12,21 @@ export default async function SeriesDetailPage({
   const series = await db.series.findUnique({
     where: { id, deletedAt: null },
     include: {
-      author: { select: { handle: true, displayName: true, avatarUrl: true } },
-      tags: { include: { tag: { select: { slug: true, name: true, isGenre: true } } } },
+      author: { select: { handle: true, displayName: true } },
+      tags: { include: { tag: { select: { slug: true, nameKo: true, isGenre: true } } } },
       episodes: {
         where: { deletedAt: null, publishedAt: { not: null, lte: new Date() } },
         orderBy: { order: 'desc' },
         select: { id: true, title: true, order: true, publishedAt: true, viewsCount: true, likesCount: true },
       },
-      _count: { select: { episodes: true, likes: true } },
+      _count: { select: { episodes: true } },
     },
   });
 
   if (!series) notFound();
 
   const genreTag = series.tags.find((t) => t.tag.isGenre);
-  const genreName = genreTag?.tag.name ?? '기타';
+  const genreName = genreTag?.tag.nameKo ?? '기타';
   const statusLabel = series.status === 'COMPLETED' ? '완결' : series.status === 'HIATUS' ? '휴재' : '연재중';
   const statusClass = series.status === 'COMPLETED' ? 'status-end' : series.status === 'HIATUS' ? 'status-hiatus' : 'status-ongoing';
 
@@ -81,7 +81,7 @@ export default async function SeriesDetailPage({
                   <span className="series-stat-label">조회수</span>
                 </div>
                 <div className="series-stat">
-                  <span className="series-stat-value">{fmt(series._count.likes)}</span>
+                  <span className="series-stat-value">{fmt(series.likesTotal)}</span>
                   <span className="series-stat-label">좋아요</span>
                 </div>
                 <div className="series-stat">
@@ -101,10 +101,10 @@ export default async function SeriesDetailPage({
             </div>
           </div>
 
-          {series.synopsis && (
+          {series.description && (
             <section className="series-section">
               <h2 className="series-section-title">시놉시스</h2>
-              <p className="series-synopsis">{series.synopsis}</p>
+              <p className="series-synopsis">{series.description}</p>
             </section>
           )}
 
@@ -143,7 +143,7 @@ export default async function SeriesDetailPage({
               <div className="series-tags">
                 {series.tags.map((t) => (
                   <span key={t.tag.slug} className={`series-tag ${t.tag.isGenre ? 'genre' : ''}`}>
-                    {t.tag.name}
+                    {t.tag.nameKo}
                   </span>
                 ))}
               </div>
