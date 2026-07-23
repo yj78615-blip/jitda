@@ -86,10 +86,12 @@ export function jsonError(err: unknown) {
     }
     return NextResponse.json(body, { status: err.status, headers });
   }
-  // 알 수 없는 에러 → 500 + 세부 정보는 서버 로그에만
+  // 알 수 없는 에러 → 500. MVP 진단을 위해 원인 문자열을 응답에 포함.
+  // ponytail: 프로덕션 안정화 후 프로덕션에서는 일반 메시지로 되돌리기.
   console.error('[unhandled]', err);
+  const detail = err instanceof Error ? err.message : String(err);
   return NextResponse.json(
-    { error: { code: 'internal_error', message: '서버 오류가 발생했습니다.' } },
+    { error: { code: 'internal_error', message: `서버 오류: ${detail}` } },
     { status: 500 }
   );
 }
