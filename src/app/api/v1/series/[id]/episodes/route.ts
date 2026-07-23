@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { idFor } from '@/lib/id';
 import {
-  withErrors, jsonOk, jsonCreated, badRequest, notFound, validationFailed, conflict,
+  withErrors, jsonOk, jsonCreated, badRequest, notFound, validationFailed, conflict, APIError,
 } from '@/lib/api-error';
 import { assertOwner, assertOwnedReadyImages } from '@/lib/access';
 import { CreateEpisodeSchema, EpisodeListQuerySchema } from '@/lib/schemas/episode';
