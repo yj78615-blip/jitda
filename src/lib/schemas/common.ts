@@ -11,12 +11,12 @@ export const zEmail = z
   .max(254, '이메일이 너무 깁니다.')
   .email('올바른 이메일이 아닙니다.');
 
-// Handle — [a-z0-9_]{3,20}
+// Handle — [a-z0-9_.-]{3,20}
 export const zHandle = z
   .string()
   .min(3, '3자 이상이어야 합니다.')
   .max(20, '20자를 넘을 수 없습니다.')
-  .regex(/^[a-z0-9_]+$/, '소문자·숫자·언더스코어만 가능합니다.');
+  .regex(/^[a-z0-9_.\-]+$/, '소문자·숫자·언더스코어(_)·하이픈(-)·마침표(.)만 가능합니다.');
 
 // 필명 — 1~30자, 제어 문자 금지
 export const zDisplayName = z
