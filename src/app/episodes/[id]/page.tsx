@@ -119,6 +119,7 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
       <div className="viewer-app">
         <div className="viewer-loading">
           <p>에피소드를 불러올 수 없습니다.</p>
+          {loadError && <p style={{ color: 'var(--danger)', fontSize: 12, maxWidth: 500 }}>{loadError}</p>}
           <Link href="/" className="btn btn-ghost">홈으로</Link>
         </div>
       </div>
