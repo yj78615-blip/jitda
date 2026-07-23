@@ -41,6 +41,7 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
   const [series, setSeries] = useState<SeriesInfo | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [imageLoading, setImageLoading] = useState(false);
   const [showList, setShowList] = useState(false);
@@ -48,10 +49,13 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     params.then(async ({ id }) => {
       setLoading(true);
+      setLoadError(null);
       try {
         const res = await fetch(`/api/v1/episodes/${id}`);
         if (!res.ok) {
           if (res.status === 401) { refreshAuth(); }
+          const errData = await res.json().catch(() => null);
+          setLoadError(`[${res.status}] ${errData?.error?.message ?? '응답 파싱 실패'}`);
           return;
         }
         const data = await res.json() as { episode: EpisodeDTO };
@@ -69,8 +73,8 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
           const epsData = await episodesRes.json() as { episodes: EpisodeSummary[] };
           setEpisodes(epsData.episodes ?? []);
         }
-      } catch {
-        // fail silently
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : '알 수 없는 오류');
       } finally {
         setLoading(false);
       }
