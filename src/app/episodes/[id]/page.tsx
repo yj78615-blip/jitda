@@ -58,20 +58,21 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
           setLoadError(`[${res.status}] ${errData?.error?.message ?? '응답 파싱 실패'}`);
           return;
         }
-        const data = await res.json() as { episode: EpisodeDTO };
-        setEpisode(data.episode);
+        // 서버는 EpisodeDTO를 직접 반환 (wrapper 없음)
+        const ep = await res.json() as EpisodeDTO;
+        setEpisode(ep);
         setCurrentPage(1);
 
-        const seriesRes = await fetch(`/api/v1/series/${data.episode.series_id}`);
+        const seriesRes = await fetch(`/api/v1/series/${ep.series_id}`);
         if (seriesRes.ok) {
-          const seriesData = await seriesRes.json() as { series: SeriesInfo };
-          setSeries(seriesData.series);
+          const s = await seriesRes.json() as SeriesInfo;
+          setSeries(s);
         }
 
-        const episodesRes = await fetch(`/api/v1/episodes?seriesId=${data.episode.series_id}`);
+        const episodesRes = await fetch(`/api/v1/series/${ep.series_id}/episodes`);
         if (episodesRes.ok) {
-          const epsData = await episodesRes.json() as { episodes: EpisodeSummary[] };
-          setEpisodes(epsData.episodes ?? []);
+          const epsData = await episodesRes.json() as { items: EpisodeSummary[] };
+          setEpisodes(epsData.items ?? []);
         }
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : '알 수 없는 오류');
