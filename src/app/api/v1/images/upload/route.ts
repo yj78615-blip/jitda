@@ -58,19 +58,24 @@ export const POST = withErrors(async (req: NextRequest) => {
 
   // Storage 는 아직 파일 없음 — url 은 미리 넣어두지만 status 는 AWAITING_UPLOAD.
   // 클라가 PUT 완료 후 PATCH 로 READY 전환.
-  await db.image.create({
-    data: {
-      id,
-      uploaderId: user.id,
-      purpose,
-      url: publicUrl,
-      status: 'AWAITING_UPLOAD',
-      contentType: content_type,
-      fileSize: file_size ?? null,
-      width: width ?? null,
-      height: height ?? null,
-    },
-  });
+  try {
+    await db.image.create({
+      data: {
+        id,
+        uploaderId: user.id,
+        purpose,
+        url: publicUrl,
+        status: 'AWAITING_UPLOAD',
+        contentType: content_type,
+        fileSize: file_size ?? null,
+        width: width ?? null,
+        height: height ?? null,
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'DB 오류';
+    throw new APIError(500, 'internal_error', `DB image.create: ${msg}`);
+  }
 
   return jsonOk({
     image: {

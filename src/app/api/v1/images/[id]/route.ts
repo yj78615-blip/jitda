@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { withErrors, jsonOk, notFound, badRequest, forbidden } from '@/lib/api-error';
+import { withErrors, jsonOk, notFound, badRequest, forbidden, APIError } from '@/lib/api-error';
 import { requireUser } from '@/lib/auth/session';
 import { toImageDTO } from '@/lib/mappers';
 
@@ -57,17 +57,23 @@ export const PATCH = withErrors(async (req: NextRequest, ctx: { params: Promise<
     throw badRequest('READY 상태는 url 이 필요합니다.');
   }
 
-  const updated = await db.image.update({
-    where: { id },
-    data: {
-      ...(body.url !== undefined ? { url: body.url } : {}),
-      ...(body.status !== undefined ? { status: body.status } : {}),
-      ...(body.width !== undefined ? { width: body.width } : {}),
-      ...(body.height !== undefined ? { height: body.height } : {}),
-      ...(body.file_size !== undefined ? { fileSize: body.file_size } : {}),
-      ...(body.content_type !== undefined ? { contentType: body.content_type } : {}),
-    },
-  });
+  let updated;
+  try {
+    updated = await db.image.update({
+      where: { id },
+      data: {
+        ...(body.url !== undefined ? { url: body.url } : {}),
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.width !== undefined ? { width: body.width } : {}),
+        ...(body.height !== undefined ? { height: body.height } : {}),
+        ...(body.file_size !== undefined ? { fileSize: body.file_size } : {}),
+        ...(body.content_type !== undefined ? { contentType: body.content_type } : {}),
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'DB 오류';
+    throw new APIError(500, 'internal_error', `DB image.update: ${msg}`);
+  }
 
   return jsonOk({ image: toImageDTO(updated) });
 });
