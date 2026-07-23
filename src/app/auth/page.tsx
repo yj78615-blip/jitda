@@ -104,15 +104,15 @@ function AuthForm() {
                     type="text"
                     placeholder="myname"
                     value={form.handle}
-                    onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                    onChange={(e) => setForm({ ...form, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_.\-]/g, '') })}
                     required
                     minLength={3}
                     maxLength={20}
-                    pattern="[a-z0-9_]{3,20}"
+                    pattern="[a-z0-9_.\-]{3,20}"
                     autoComplete="username"
                   />
                   <small style={{ color: 'var(--muted)', fontSize: 12 }}>
-                    영문 소문자·숫자·언더스코어(_) 3~20자. 프로필 주소: <code>if.kr/@{form.handle || 'myname'}</code>
+                    영문 소문자·숫자·언더스코어(_)·하이픈(-)·마침표(.) 3~20자. 프로필 주소: <code>if.kr/@{form.handle || 'myname'}</code>
                   </small>
                 </div>
               </>
