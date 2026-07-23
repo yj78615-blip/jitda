@@ -152,6 +152,7 @@ export default function StudioPage() {
             onTabChange={setWorksTab}
             loading={loading}
             onNav={setSection}
+            onRefresh={async () => { if (user) await fetchSeries(user.id); }}
           />
         )}
         {section === 'upload' && (
@@ -292,12 +293,39 @@ function DashboardSection({
    ================================================================ */
 
 function WorksSection({
-  series, tab, onTabChange, loading, onNav,
+  series, tab, onTabChange, loading, onNav, onRefresh,
 }: {
   series: SeriesItem[]; tab: WorksTab; onTabChange: (t: WorksTab) => void;
   loading: boolean; onNav: (s: Section) => void;
+  onRefresh: () => Promise<void> | void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const deleteSeries = async (id: string, title: string) => {
+    if (!confirm(`"${title}" 작품 전체를 삭제하시겠어요? 회차·이미지도 함께 사라지고 되돌릴 수 없습니다.`)) return;
+    const token = getAccessToken();
+    if (!token) { setDeleteError('로그인이 필요합니다.'); return; }
+    setDeletingId(id); setDeleteError(null);
+    try {
+      const res = await fetch(`/api/v1/series/${id}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok && res.status !== 204) {
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err?.error?.message ?? '삭제 실패');
+        return;
+      }
+      if (expandedId === id) setExpandedId(null);
+      await onRefresh();
+    } catch {
+      setDeleteError('네트워크 오류');
+    } finally {
+      setDeletingId(null);
+    }
+  };
   return (
     <>
       <div className="studio-page-head">
@@ -330,6 +358,16 @@ function WorksSection({
           개별 포스트
         </button>
       </div>
+
+      {deleteError && (
+        <div style={{
+          padding: '10px 12px', marginBottom: 12, fontSize: 13, borderRadius: 8,
+          background: 'color-mix(in oklab, var(--danger) 12%, transparent)',
+          color: 'var(--danger)',
+        }}>
+          {deleteError}
+        </div>
+      )}
 
       {loading ? (
         <div className="studio-loading"><span className="spinner" /></div>
@@ -381,6 +419,14 @@ function WorksSection({
                             {expandedId === s.id ? '회차 접기' : '회차 관리'}
                           </button>
                           <button className="studio-row-btn" onClick={() => onNav('upload')}>+ 새 회차</button>
+                          <button
+                            className="studio-row-btn"
+                            onClick={() => deleteSeries(s.id, s.title)}
+                            disabled={deletingId === s.id}
+                            style={{ color: 'var(--danger)' }}
+                          >
+                            {deletingId === s.id ? '삭제 중...' : '작품 삭제'}
+                          </button>
                         </div>
                       </td>
                     </tr>
