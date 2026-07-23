@@ -442,7 +442,8 @@
   flex: 1; display: flex; flex-direction: column; align-items: center;
   justify-content: center; padding: 72px 16px 80px; cursor: pointer;
 }
-.viewer-panel { width: 100%; max-width: 800px; transition: opacity 0.2s; }
+.viewer-panel { width: 100%; max-width: 1440px; transition: opacity 0.2s; }
+.viewer-panel-img { width: 100%; height: auto; display: block; }
 .viewer-panel.loading { opacity: 0.3; }
 .viewer-panel-inner { position: relative; }
 .viewer-panel-placeholder { aspect-ratio: 3/4; border-radius: 8px; overflow: hidden; }
