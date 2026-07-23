@@ -151,14 +151,16 @@ export const POST = withErrors(async (req: NextRequest, ctx: { params: Promise<{
       where: { id: { in: body.image_ids } },
       data: { episodeId: created.id, ownerType: 'EPISODE', ownerId: created.id },
     });
-    // 이미지 순서 반영
-    for (let i = 0; i < body.image_ids.length; i++) {
-      await tx.image.update({ where: { id: body.image_ids[i]! }, data: { order: i + 1 } });
-    }
+    // 이미지 순서 반영 — 병렬로 (순차는 28+ 이미지에서 tx timeout)
+    await Promise.all(
+      body.image_ids.map((imgId, i) =>
+        tx.image.update({ where: { id: imgId }, data: { order: i + 1 } })
+      )
+    );
     // 시리즈 updatedAt bump (Prisma 는 자동 반영)
     await tx.series.update({ where: { id: seriesId }, data: { updatedAt: new Date() } });
     return created;
-    });
+    }, { timeout: 30_000, maxWait: 10_000 });
   } catch (e) {
     if (e instanceof APIError) throw e;
     const msg = e instanceof Error ? e.message : 'DB 오류';
