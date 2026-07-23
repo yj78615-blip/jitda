@@ -105,11 +105,11 @@ export const POST = withErrors(async (req: NextRequest, ctx: { params: Promise<{
 
   await assertOwnedReadyImages(body.image_ids, user.id);
 
-  // 자동 회차 번호
+  // 자동 회차 번호 — soft-deleted 도 포함해 항상 앞으로 진행 (재사용 방지).
   let order = body.order;
   if (order == null) {
     const last = await db.episode.findFirst({
-      where: { seriesId, deletedAt: null },
+      where: { seriesId },
       orderBy: { order: 'desc' },
       select: { order: true },
     });
