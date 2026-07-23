@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import { useAuth, getAccessToken, type AuthUser } from '@/lib/auth-context';
 import { GENRES } from '@/lib/genres';
