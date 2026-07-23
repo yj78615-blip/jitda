@@ -444,6 +444,8 @@
 }
 .viewer-panel { width: 100%; max-width: 1440px; transition: opacity 0.2s; }
 .viewer-panel-img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.viewer-scroll-stack { display: flex; flex-direction: column; gap: 0; }
+.viewer-scroll .viewer-main { padding-bottom: 80px; }
 .viewer-panel.loading { opacity: 0.3; }
 .viewer-panel-inner { position: relative; }
 .viewer-panel-placeholder { aspect-ratio: 3/4; border-radius: 8px; overflow: hidden; }
