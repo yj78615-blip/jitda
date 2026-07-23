@@ -529,7 +529,7 @@ function EpisodeManagePanel({ seriesId }: { seriesId: string }) {
             key={ep.id}
             style={{
               display: 'grid',
-              gridTemplateColumns: '56px 1fr auto auto auto',
+              gridTemplateColumns: '56px 1fr auto auto auto auto',
               gap: 12,
               alignItems: 'center',
               padding: '8px 12px',
@@ -548,6 +548,17 @@ function EpisodeManagePanel({ seriesId }: { seriesId: string }) {
             </Link>
             <span style={{ color: 'var(--muted)', fontSize: 12 }}>조회 {fmtNum(ep.stats.views)}</span>
             <span style={{ color: 'var(--muted)', fontSize: 12 }}>{ep.published_at ? relTime(ep.published_at) : '미공개'}</span>
+            <Link
+              href={`/studio/episodes/${ep.id}/edit`}
+              style={{
+                padding: '4px 10px', fontSize: 12,
+                border: '1px solid var(--line)', borderRadius: 4,
+                background: 'transparent', color: 'var(--ink)',
+                textDecoration: 'none',
+              }}
+            >
+              편집
+            </Link>
             <button
               onClick={() => deleteEpisode(ep.id, ep.title)}
               disabled={deletingId === ep.id}
