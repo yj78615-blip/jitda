@@ -443,7 +443,7 @@
   justify-content: center; padding: 72px 16px 80px; cursor: pointer;
 }
 .viewer-panel { width: 100%; max-width: 1440px; transition: opacity 0.2s; }
-.viewer-panel-img { width: 100%; height: auto; display: block; }
+.viewer-panel-img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 .viewer-panel.loading { opacity: 0.3; }
 .viewer-panel-inner { position: relative; }
 .viewer-panel-placeholder { aspect-ratio: 3/4; border-radius: 8px; overflow: hidden; }
