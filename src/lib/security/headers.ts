@@ -13,7 +13,7 @@ function buildCSP(): string {
     : "connect-src 'self' https://api.stripe.com";
   return [
     "default-src 'self'",
-    "img-src 'self' https://cdn.jitda.com data: blob:",
+    "img-src 'self' https://*.supabase.co https://*.supabase.in https://cdn.jitda.com data: blob:",
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",

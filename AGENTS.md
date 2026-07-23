@@ -184,7 +184,7 @@ export const POST = withErrors(async (req: NextRequest) => {
 
 - [ ] Follow / Subscription / Tip / Comment / Reaction / Notification 엔드포인트
 - [ ] Refresh 쿠키 fallback 을 `getSessionFromRequest` 에 추가 (서버 컴포넌트에서 현재 유저 인식)
-- [ ] Upload presigned URL 플로우 (Supabase Storage)
+- [x] 이미지 업로드 플로우 — 서버 프록시 방식 (presigned URL 대신): `POST /images/upload` multipart → Supabase Storage 업로드 → `READY` Image 반환. `src/lib/storage.ts` 참조. (2026-07-24)
 - [ ] Stripe webhook 이벤트 핸들러 (지금은 서명 검증만, 이벤트 처리 TODO)
 - [ ] OAuth (Google/Apple, PKCE + JWKS)
 - [ ] 이메일 인증 (Resend)

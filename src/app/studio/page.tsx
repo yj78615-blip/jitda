@@ -156,6 +156,7 @@ export default function StudioPage() {
         )}
         {section === 'upload' && (
           <UploadSection
+            series={series}
             onCreated={async () => {
               if (user) await fetchSeries(user.id);
               setSection('works');
@@ -392,7 +393,31 @@ function WorksSection({
    Upload
    ================================================================ */
 
-function UploadSection({ onCreated }: { onCreated: () => Promise<void> | void }) {
+function UploadSection({
+  onCreated, series,
+}: {
+  onCreated: () => Promise<void> | void;
+  series: SeriesItem[];
+}) {
+  return (
+    <>
+      <div className="studio-page-head">
+        <div>
+          <h1 className="studio-page-title">업로드</h1>
+          <div className="studio-page-sub">새 시리즈를 만들거나 회차를 게시하세요</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: 24 }}>
+        <NewSeriesForm onCreated={onCreated} />
+        <NewEpisodeForm series={series} onCreated={onCreated} />
+      </div>
+    </>
+  );
+}
+
+/* ---------- 새 시리즈 폼 ---------- */
+function NewSeriesForm({ onCreated }: { onCreated: () => Promise<void> | void }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [genres, setGenres] = useState<string[]>([]);
@@ -408,10 +433,9 @@ function UploadSection({ onCreated }: { onCreated: () => Promise<void> | void })
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setError(null); setOk(false);
     if (!title.trim()) { setError('제목을 입력해주세요.'); return; }
     if (genres.length === 0) { setError('장르를 1개 이상 선택해주세요.'); return; }
-
     const token = getAccessToken();
     if (!token) { setError('로그인이 필요합니다.'); return; }
 
@@ -419,10 +443,7 @@ function UploadSection({ onCreated }: { onCreated: () => Promise<void> | void })
     try {
       const res = await fetch('/api/v1/series', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || undefined,
@@ -430,10 +451,7 @@ function UploadSection({ onCreated }: { onCreated: () => Promise<void> | void })
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data?.error?.message || '작품 생성에 실패했습니다.');
-        return;
-      }
+      if (!res.ok) { setError(data?.error?.message || '시리즈 생성에 실패했습니다.'); return; }
       setOk(true);
       setTitle(''); setDescription(''); setGenres([]);
       await onCreated();
@@ -445,116 +463,280 @@ function UploadSection({ onCreated }: { onCreated: () => Promise<void> | void })
   };
 
   return (
-    <>
-      <div className="studio-page-head">
-        <div>
-          <h1 className="studio-page-title">업로드</h1>
-          <div className="studio-page-sub">새 시리즈를 만들어 게시하세요</div>
+    <form onSubmit={submit} className="studio-card" style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>새 시리즈 만들기</h3>
+
+      <div>
+        <label htmlFor="s-title" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+          제목 <span style={{ color: 'var(--accent)' }}>*</span>
+        </label>
+        <input id="s-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+          maxLength={100} required placeholder="예: 달빛 아래 우리" style={INPUT_STYLE} />
+      </div>
+
+      <div>
+        <label htmlFor="s-desc" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>소개</label>
+        <textarea id="s-desc" value={description} onChange={(e) => setDescription(e.target.value)}
+          maxLength={2000} rows={4} placeholder="작품 소개를 짧게 적어주세요."
+          style={{ ...INPUT_STYLE, resize: 'vertical', fontFamily: 'inherit' }} />
+      </div>
+
+      <div>
+        <label className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+          장르 <span style={{ color: 'var(--accent)' }}>*</span>{' '}
+          <span style={{ color: 'var(--muted)', fontSize: 11 }}>(최대 3개)</span>
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {GENRES.map((g) => {
+            const active = genres.includes(g.slug);
+            return (
+              <button type="button" key={g.slug} onClick={() => toggleGenre(g.slug)} style={PILL_STYLE(active)}>
+                {g.nameKo}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <form onSubmit={submit} className="studio-card" style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
-        <div>
-          <label htmlFor="s-title" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
-            제목 <span style={{ color: 'var(--accent)' }}>*</span>
-          </label>
-          <input
-            id="s-title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={100}
-            required
-            placeholder="예: 달빛 아래 우리"
-            style={{
-              width: '100%', padding: '10px 12px', fontSize: 14,
-              border: '1px solid var(--line)', borderRadius: 8,
-              background: 'var(--surface)', color: 'var(--ink)',
-            }}
-          />
-        </div>
+      {error && <FormMsg tone="danger">{error}</FormMsg>}
+      {ok && !error && <FormMsg tone="success">시리즈를 만들었습니다.</FormMsg>}
 
-        <div>
-          <label htmlFor="s-desc" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
-            소개
-          </label>
-          <textarea
-            id="s-desc"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            maxLength={2000}
-            rows={4}
-            placeholder="작품 소개를 짧게 적어주세요."
-            style={{
-              width: '100%', padding: '10px 12px', fontSize: 14, resize: 'vertical',
-              border: '1px solid var(--line)', borderRadius: 8,
-              background: 'var(--surface)', color: 'var(--ink)', fontFamily: 'inherit',
-            }}
-          />
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button type="submit" className="btn studio-btn-accent" disabled={submitting}>
+          {submitting ? '만드는 중...' : '시리즈 만들기'}
+        </button>
+      </div>
+    </form>
+  );
+}
 
-        <div>
-          <label className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
-            장르 <span style={{ color: 'var(--accent)' }}>*</span>{' '}
-            <span style={{ color: 'var(--muted)', fontSize: 11 }}>(최대 3개)</span>
-          </label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {GENRES.map((g) => {
-              const active = genres.includes(g.slug);
-              return (
-                <button
-                  type="button"
-                  key={g.slug}
-                  onClick={() => toggleGenre(g.slug)}
-                  style={{
-                    padding: '6px 14px', fontSize: 13, borderRadius: 999,
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
-                    background: active ? 'var(--accent)' : 'var(--surface)',
-                    color: active ? '#fff' : 'var(--ink)',
-                    cursor: 'pointer', fontWeight: active ? 600 : 400,
-                  }}
-                >
-                  {g.nameKo}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+/* ---------- 새 회차 폼 (이미지 업로드) ---------- */
+interface StagedFile { key: string; file: File; preview: string }
 
-        {error && (
-          <div style={{
-            padding: '10px 12px', fontSize: 13, borderRadius: 8,
-            background: 'color-mix(in oklab, var(--danger) 12%, transparent)',
-            color: 'var(--danger)',
-          }}>
-            {error}
-          </div>
-        )}
-        {ok && !error && (
-          <div style={{
-            padding: '10px 12px', fontSize: 13, borderRadius: 8,
-            background: 'color-mix(in oklab, var(--success) 12%, transparent)',
-            color: 'var(--success)',
-          }}>
-            작품을 게시했습니다.
-          </div>
-        )}
+function NewEpisodeForm({
+  series, onCreated,
+}: {
+  series: SeriesItem[];
+  onCreated: () => Promise<void> | void;
+}) {
+  const [seriesId, setSeriesId] = useState('');
+  const [title, setTitle] = useState('');
+  const [files, setFiles] = useState<StagedFile[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            type="submit"
-            className="btn studio-btn-accent"
-            disabled={submitting}
-          >
-            {submitting ? '게시 중...' : '작품 게시하기'}
-          </button>
-        </div>
+  useEffect(() => {
+    if (!seriesId && series.length > 0) setSeriesId(series[0]!.id);
+  }, [series, seriesId]);
 
-        <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>
-          시리즈를 먼저 만든 뒤 각 회차를 추가할 수 있습니다. 회차 이미지 업로드는 Storage 연결 후 오픈됩니다.
+  // 언마운트 시 preview URL 정리
+  useEffect(() => {
+    return () => { files.forEach((f) => URL.revokeObjectURL(f.preview)); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onPickFiles = (input: FileList | null) => {
+    if (!input) return;
+    const picked: StagedFile[] = [];
+    for (let i = 0; i < input.length; i++) {
+      const f = input[i]!;
+      if (!f.type.startsWith('image/')) continue;
+      picked.push({
+        key: `${f.name}-${f.size}-${f.lastModified}-${Math.random()}`,
+        file: f,
+        preview: URL.createObjectURL(f),
+      });
+    }
+    setFiles((prev) => [...prev, ...picked]);
+  };
+
+  const moveFile = (i: number, dir: -1 | 1) => {
+    setFiles((prev) => {
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j]!, next[i]!];
+      return next;
+    });
+  };
+
+  const removeFile = (i: number) => {
+    setFiles((prev) => {
+      URL.revokeObjectURL(prev[i]!.preview);
+      return prev.filter((_, idx) => idx !== i);
+    });
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null); setOk(false);
+    if (!seriesId) { setError('시리즈를 선택해주세요.'); return; }
+    if (!title.trim()) { setError('회차 제목을 입력해주세요.'); return; }
+    if (files.length === 0) { setError('이미지를 최소 1장 이상 선택해주세요.'); return; }
+    const token = getAccessToken();
+    if (!token) { setError('로그인이 필요합니다.'); return; }
+
+    setSubmitting(true);
+    setProgress(`0/${files.length} 업로드 준비 중...`);
+    try {
+      const imageIds: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        setProgress(`${i}/${files.length} 업로드 중 (${files[i]!.file.name})...`);
+        const fd = new FormData();
+        fd.append('purpose', 'episode_page');
+        fd.append('file', files[i]!.file);
+        const res = await fetch('/api/v1/images/upload', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `${files[i]!.file.name} 업로드 실패`);
+        }
+        const { image } = await res.json();
+        imageIds.push(image.id);
+      }
+      setProgress(`${files.length}/${files.length} 회차 생성 중...`);
+      const res = await fetch(`/api/v1/series/${seriesId}/episodes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: title.trim(), image_ids: imageIds }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || '회차 생성에 실패했습니다.');
+      }
+      setOk(true);
+      files.forEach((f) => URL.revokeObjectURL(f.preview));
+      setFiles([]); setTitle('');
+      await onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '알 수 없는 오류');
+    } finally {
+      setSubmitting(false);
+      setProgress('');
+    }
+  };
+
+  if (series.length === 0) {
+    return (
+      <div className="studio-card" style={{ maxWidth: 640, padding: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>새 회차 게시</h3>
+        <p style={{ color: 'var(--muted)', fontSize: 13, margin: 0 }}>
+          시리즈를 먼저 만든 뒤 회차를 추가할 수 있습니다.
         </p>
-      </form>
-    </>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="studio-card" style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>새 회차 게시</h3>
+
+      <div>
+        <label htmlFor="e-series" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+          시리즈 <span style={{ color: 'var(--accent)' }}>*</span>
+        </label>
+        <select id="e-series" value={seriesId} onChange={(e) => setSeriesId(e.target.value)} style={INPUT_STYLE}>
+          {series.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="e-title" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+          회차 제목 <span style={{ color: 'var(--accent)' }}>*</span>
+        </label>
+        <input id="e-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+          maxLength={100} required placeholder="예: 1화 — 시작" style={INPUT_STYLE} />
+      </div>
+
+      <div>
+        <label className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+          이미지 <span style={{ color: 'var(--accent)' }}>*</span>{' '}
+          <span style={{ color: 'var(--muted)', fontSize: 11 }}>(최대 20MiB · jpg/png/webp/gif)</span>
+        </label>
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple
+          onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }}
+          style={{ fontSize: 13 }} />
+      </div>
+
+      {files.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+          {files.map((f, i) => (
+            <div key={f.key} style={{
+              position: 'relative', border: '1px solid var(--line)', borderRadius: 8,
+              overflow: 'hidden', aspectRatio: '3/4', background: 'var(--surface-alt, #f8f7f4)',
+            }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={f.preview} alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <div style={{
+                position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)',
+                color: '#fff', fontSize: 11, padding: '2px 6px', borderRadius: 4,
+              }}>{i + 1}</div>
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                display: 'flex', gap: 2, padding: 2, background: 'rgba(0,0,0,0.55)',
+              }}>
+                <button type="button" onClick={() => moveFile(i, -1)} disabled={i === 0}
+                  style={MINI_BTN_STYLE} title="위로">↑</button>
+                <button type="button" onClick={() => moveFile(i, 1)} disabled={i === files.length - 1}
+                  style={MINI_BTN_STYLE} title="아래로">↓</button>
+                <button type="button" onClick={() => removeFile(i)}
+                  style={{ ...MINI_BTN_STYLE, marginLeft: 'auto' }} title="삭제">✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <FormMsg tone="danger">{error}</FormMsg>}
+      {ok && !error && <FormMsg tone="success">회차를 게시했습니다.</FormMsg>}
+      {progress && !error && !ok && <FormMsg tone="neutral">{progress}</FormMsg>}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button type="submit" className="btn studio-btn-accent" disabled={submitting || files.length === 0}>
+          {submitting ? '게시 중...' : '회차 게시하기'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ---------- 공용 스타일·컴포넌트 ---------- */
+const INPUT_STYLE: React.CSSProperties = {
+  width: '100%', padding: '10px 12px', fontSize: 14,
+  border: '1px solid var(--line)', borderRadius: 8,
+  background: 'var(--surface)', color: 'var(--ink)',
+};
+
+const PILL_STYLE = (active: boolean): React.CSSProperties => ({
+  padding: '6px 14px', fontSize: 13, borderRadius: 999,
+  border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+  background: active ? 'var(--accent)' : 'var(--surface)',
+  color: active ? '#fff' : 'var(--ink)',
+  cursor: 'pointer', fontWeight: active ? 600 : 400,
+});
+
+const MINI_BTN_STYLE: React.CSSProperties = {
+  padding: '4px 8px', fontSize: 12, color: '#fff',
+  background: 'transparent', border: 'none', cursor: 'pointer',
+};
+
+function FormMsg({ tone, children }: { tone: 'danger' | 'success' | 'neutral'; children: React.ReactNode }) {
+  const bg = tone === 'danger'
+    ? 'color-mix(in oklab, var(--danger) 12%, transparent)'
+    : tone === 'success'
+    ? 'color-mix(in oklab, var(--success) 12%, transparent)'
+    : 'color-mix(in oklab, var(--muted) 12%, transparent)';
+  const fg = tone === 'danger' ? 'var(--danger)' : tone === 'success' ? 'var(--success)' : 'var(--ink)';
+  return (
+    <div style={{ padding: '10px 12px', fontSize: 13, borderRadius: 8, background: bg, color: fg }}>
+      {children}
+    </div>
   );
 }
 
