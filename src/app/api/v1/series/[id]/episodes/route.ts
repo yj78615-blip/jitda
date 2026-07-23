@@ -13,6 +13,7 @@ import { requireUser } from '@/lib/auth/session';
 import type { Prisma } from '@prisma/client';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60; // 28+ 이미지 첨부 회차 처리 여유
 
 // ============================================================
 //  GET /api/v1/series/{id}/episodes
@@ -125,7 +126,9 @@ export const POST = withErrors(async (req: NextRequest, ctx: { params: Promise<{
   const episodeId = idFor.episode();
   const publishedAt = body.published_at ? new Date(body.published_at) : new Date();
 
-  const episode = await db.$transaction(async (tx) => {
+  let episode;
+  try {
+    episode = await db.$transaction(async (tx) => {
     // deleted 회차 재사용 방지: 완전 새 id 로 생성
     if (dup?.deletedAt) {
       // 그냥 다른 order 를 쓰라고 안내하는 게 안전. 여기서는 409 그대로.
@@ -155,7 +158,12 @@ export const POST = withErrors(async (req: NextRequest, ctx: { params: Promise<{
     // 시리즈 updatedAt bump (Prisma 는 자동 반영)
     await tx.series.update({ where: { id: seriesId }, data: { updatedAt: new Date() } });
     return created;
-  });
+    });
+  } catch (e) {
+    if (e instanceof APIError) throw e;
+    const msg = e instanceof Error ? e.message : 'DB 오류';
+    throw new APIError(500, 'internal_error', `DB episode.create tx: ${msg}`);
+  }
 
   const images = await db.image.findMany({
     where: { episodeId: episode.id },
