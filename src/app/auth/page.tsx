@@ -98,7 +98,7 @@ function AuthForm() {
                   />
                 </div>
                 <div className="auth-field">
-                  <label htmlFor="handle">@핸들</label>
+                  <label htmlFor="handle">@아이디</label>
                   <input
                     id="handle"
                     type="text"
