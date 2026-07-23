@@ -109,8 +109,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const data = await res.json() as { error?: { message: string } };
-    if (!res.ok) throw new Error(data.error?.message ?? '회원가입에 실패했습니다.');
+    const data = await res.json() as {
+      error?: { message: string; details?: { fields?: Record<string, string> } };
+    };
+    if (!res.ok) {
+      const fields = data.error?.details?.fields;
+      const detail = fields
+        ? Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join(' · ')
+        : null;
+      throw new Error(detail ? `${data.error?.message ?? '회원가입 실패'} (${detail})` : (data.error?.message ?? '회원가입에 실패했습니다.'));
+    }
     await login(body.email, body.password);
   }, [login]);
 
