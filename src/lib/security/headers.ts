@@ -9,8 +9,8 @@ function buildCSP(): string {
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com"
     : "script-src 'self' 'unsafe-inline' https://js.stripe.com";
   const connectSrc = isDev
-    ? "connect-src 'self' https://api.stripe.com ws: wss:"
-    : "connect-src 'self' https://api.stripe.com";
+    ? "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.supabase.in ws: wss:"
+    : "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.supabase.in";
   return [
     "default-src 'self'",
     "img-src 'self' https://*.supabase.co https://*.supabase.in https://cdn.jitda.com data: blob:",

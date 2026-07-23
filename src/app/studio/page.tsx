@@ -583,20 +583,51 @@ function NewEpisodeForm({
     try {
       const imageIds: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        setProgress(`${i}/${files.length} 업로드 중 (${files[i]!.file.name})...`);
-        const fd = new FormData();
-        fd.append('purpose', 'episode_page');
-        fd.append('file', files[i]!.file);
-        const res = await fetch('/api/v1/images/upload', {
+        const f = files[i]!.file;
+        setProgress(`${i + 1}/${files.length} 업로드 중 (${f.name})...`);
+
+        // 1) 서명된 URL 발급
+        const initRes = await fetch('/api/v1/images/upload', {
           method: 'POST',
-          headers: { authorization: `Bearer ${token}` },
-          body: fd,
+          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            purpose: 'episode_page',
+            content_type: f.type,
+            file_size: f.size,
+          }),
         });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `${files[i]!.file.name} 업로드 실패`);
+        if (!initRes.ok) {
+          const errData = await initRes.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `${f.name} 업로드 초기화 실패`);
         }
-        const { image } = await res.json();
+        const { image } = await initRes.json();
+
+        // 2) Supabase Storage 로 직접 PUT (Vercel body 제한 우회)
+        const putRes = await fetch(image.upload_url, {
+          method: 'PUT',
+          headers: { 'Content-Type': f.type },
+          body: f,
+        });
+        if (!putRes.ok) {
+          throw new Error(`${f.name} 스토리지 업로드 실패 (${putRes.status})`);
+        }
+
+        // 3) READY 로 전환
+        const readyRes = await fetch(`/api/v1/images/${image.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            status: 'READY',
+            url: image.public_url,
+            content_type: f.type,
+            file_size: f.size,
+          }),
+        });
+        if (!readyRes.ok) {
+          const errData = await readyRes.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `${f.name} 상태 갱신 실패`);
+        }
+
         imageIds.push(image.id);
       }
       setProgress(`${files.length}/${files.length} 회차 생성 중...`);

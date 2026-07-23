@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase Storage 헬퍼.
-// 클라 SDK 없이 서버가 직접 업로드 → 서비스 롤 키만 필요 (RLS 우회).
-// bucket: `images` (public read). AGENTS.md Phase 1 backlog.
+// 클라 → Storage 직접 PUT (presigned upload URL) 방식 → Vercel 4.5 MiB body 제한 우회.
+// 서버는 서명된 URL 만 발급, 파일 바이트는 서버를 거치지 않음.
 
 const BUCKET = 'images';
 
@@ -15,27 +15,27 @@ function client() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export interface UploadArgs {
-  path: string;
-  bytes: ArrayBuffer;
-  contentType: string;
+// 서명된 업로드 URL 을 발급. 클라이언트는 이 URL 로 파일을 PUT 한다.
+export async function createSignedUploadUrl(path: string): Promise<{ signedUrl: string; publicUrl: string; token: string }> {
+  const c = client();
+  const { data, error } = await c.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error) throw new Error(`signed URL 발급 실패: ${error.message}`);
+  const { data: pub } = c.storage.from(BUCKET).getPublicUrl(path);
+  return {
+    signedUrl: data.signedUrl,
+    publicUrl: pub.publicUrl,
+    token: data.token,
+  };
 }
 
-export async function uploadImage({ path, bytes, contentType }: UploadArgs): Promise<{ publicUrl: string }> {
+// (미사용, 소용량 · 서버 프록시 경로가 필요할 때만 쓰이는 백업 헬퍼)
+// ponytail: 지금은 signed URL 로 통일. 실제로 안 쓰면 다음 청소 때 삭제.
+export async function uploadImageServerSide(opts: { path: string; bytes: ArrayBuffer; contentType: string }): Promise<{ publicUrl: string }> {
   const c = client();
-  const { error } = await c.storage.from(BUCKET).upload(path, bytes, {
-    contentType,
-    upsert: false,
-    cacheControl: '31536000',
+  const { error } = await c.storage.from(BUCKET).upload(opts.path, opts.bytes, {
+    contentType: opts.contentType, upsert: false, cacheControl: '31536000',
   });
   if (error) throw new Error(`Storage 업로드 실패: ${error.message}`);
-  const { data } = c.storage.from(BUCKET).getPublicUrl(path);
+  const { data } = c.storage.from(BUCKET).getPublicUrl(opts.path);
   return { publicUrl: data.publicUrl };
-}
-
-// CSP · 검증에 필요한 Supabase 호스트 (예: xxx.supabase.co)
-export function supabaseStorageHost(): string {
-  const url = process.env.SUPABASE_URL;
-  if (!url) return '';
-  try { return new URL(url).host; } catch { return ''; }
 }
