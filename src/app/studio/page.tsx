@@ -297,6 +297,7 @@ function WorksSection({
   series: SeriesItem[]; tab: WorksTab; onTabChange: (t: WorksTab) => void;
   loading: boolean; onNav: (s: Section) => void;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   return (
     <>
       <div className="studio-page-head">
@@ -351,32 +352,46 @@ function WorksSection({
               </thead>
               <tbody>
                 {series.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <div className="studio-table-title-cell">
-                        <div className="studio-table-thumb" />
-                        <div>
-                          <Link href={`/series/${s.id}`} className="studio-table-title">{s.title}</Link>
-                          <div className="studio-table-sub">{s.genres?.[0] || '기타'}</div>
+                  <Fragment key={s.id}>
+                    <tr>
+                      <td>
+                        <div className="studio-table-title-cell">
+                          <div className="studio-table-thumb" />
+                          <div>
+                            <Link href={`/series/${s.id}`} className="studio-table-title">{s.title}</Link>
+                            <div className="studio-table-sub">{s.genres?.[0] || '기타'}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`studio-status-pill ${s.status === 'COMPLETED' ? 'completed' : 'ongoing'}`}>
-                        {s.status === 'COMPLETED' ? '완결' : '연재중'}
-                      </span>
-                    </td>
-                    <td className="num">{s.episode_count}</td>
-                    <td className="num">{fmtNum(s.stats.views_total)}</td>
-                    <td className="num">{fmtNum(s.stats.likes_total)}</td>
-                    <td>{relTime(s.updated_at)}</td>
-                    <td>
-                      <div className="studio-row-actions">
-                        <button className="studio-row-btn">편집</button>
-                        <button className="studio-row-btn">+ 새 회차</button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td>
+                        <span className={`studio-status-pill ${s.status === 'COMPLETED' ? 'completed' : 'ongoing'}`}>
+                          {s.status === 'COMPLETED' ? '완결' : '연재중'}
+                        </span>
+                      </td>
+                      <td className="num">{s.episode_count}</td>
+                      <td className="num">{fmtNum(s.stats.views_total)}</td>
+                      <td className="num">{fmtNum(s.stats.likes_total)}</td>
+                      <td>{relTime(s.updated_at)}</td>
+                      <td>
+                        <div className="studio-row-actions">
+                          <button
+                            className="studio-row-btn"
+                            onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}
+                          >
+                            {expandedId === s.id ? '회차 접기' : '회차 관리'}
+                          </button>
+                          <button className="studio-row-btn" onClick={() => onNav('upload')}>+ 새 회차</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedId === s.id && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: 0 }}>
+                          <EpisodeManagePanel seriesId={s.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -386,6 +401,123 @@ function WorksSection({
         <div className="studio-empty">개별 포스트 기능은 준비 중입니다.</div>
       )}
     </>
+  );
+}
+
+/* ================================================================
+   회차 관리 패널 (Works 확장 행)
+   ================================================================ */
+
+interface EpisodeItem {
+  id: string;
+  title: string;
+  order: number;
+  published_at: string | null;
+  stats: { views: number; likes: number };
+}
+
+function EpisodeManagePanel({ seriesId }: { seriesId: string }) {
+  const [episodes, setEpisodes] = useState<EpisodeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchEps = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`/api/v1/series/${seriesId}/episodes?sort=order_asc`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err?.error?.message ?? '회차 목록을 불러올 수 없습니다.');
+        return;
+      }
+      const data = await res.json() as { items: EpisodeItem[] };
+      setEpisodes(data.items ?? []);
+    } catch {
+      setError('네트워크 오류');
+    } finally {
+      setLoading(false);
+    }
+  }, [seriesId]);
+
+  useEffect(() => { fetchEps(); }, [fetchEps]);
+
+  const deleteEpisode = async (id: string, title: string) => {
+    if (!confirm(`"${title}" 회차를 삭제하시겠어요? 되돌릴 수 없습니다.`)) return;
+    const token = getAccessToken();
+    if (!token) { setError('로그인이 필요합니다.'); return; }
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/v1/episodes/${id}`, {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok && res.status !== 204) {
+        const err = await res.json().catch(() => ({}));
+        setError(err?.error?.message ?? '삭제 실패');
+        return;
+      }
+      await fetchEps();
+    } catch {
+      setError('네트워크 오류');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) return <div style={{ padding: 20, textAlign: 'center' }}><span className="spinner" /></div>;
+  if (error) return <div style={{ padding: 16, color: 'var(--danger)', fontSize: 13 }}>{error}</div>;
+  if (episodes.length === 0) {
+    return (
+      <div style={{ padding: 20, color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>
+        아직 회차가 없어요. "+ 새 회차" 로 첫 회차를 만드세요.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '12px 20px', background: 'color-mix(in oklab, var(--paper) 40%, transparent)' }}>
+      <div style={{ display: 'grid', gap: 4 }}>
+        {episodes.map((ep) => (
+          <div
+            key={ep.id}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '56px 1fr auto auto auto',
+              gap: 12,
+              alignItems: 'center',
+              padding: '8px 12px',
+              background: 'var(--surface)',
+              border: '1px solid var(--line)',
+              borderRadius: 6,
+              fontSize: 13,
+            }}
+          >
+            <span style={{ color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{ep.order}화</span>
+            <Link href={`/episodes/${ep.id}`} style={{
+              color: 'var(--ink)', textDecoration: 'none',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {ep.title}
+            </Link>
+            <span style={{ color: 'var(--muted)', fontSize: 12 }}>조회 {fmtNum(ep.stats.views)}</span>
+            <span style={{ color: 'var(--muted)', fontSize: 12 }}>{ep.published_at ? relTime(ep.published_at) : '미공개'}</span>
+            <button
+              onClick={() => deleteEpisode(ep.id, ep.title)}
+              disabled={deletingId === ep.id}
+              style={{
+                padding: '4px 10px', fontSize: 12,
+                border: '1px solid var(--line)', borderRadius: 4,
+                background: 'transparent', color: 'var(--danger)',
+                cursor: deletingId === ep.id ? 'wait' : 'pointer',
+              }}
+            >
+              {deletingId === ep.id ? '삭제 중...' : '삭제'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
