@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { withErrors, jsonOk, badRequest } from '@/lib/api-error';
+import { withErrors, jsonOk, badRequest, APIError } from '@/lib/api-error';
 import { requireUser } from '@/lib/auth/session';
 import { idFor } from '@/lib/id';
 import { createSignedUploadUrl } from '@/lib/storage';
@@ -47,7 +47,14 @@ export const POST = withErrors(async (req: NextRequest) => {
   const id = idFor.image();
   const path = `${purpose}/${user.id}/${id}.${extFor(content_type)}`;
 
-  const { signedUrl, publicUrl, token } = await createSignedUploadUrl(path);
+  let signedUrl: string; let publicUrl: string; let token: string;
+  try {
+    ({ signedUrl, publicUrl, token } = await createSignedUploadUrl(path));
+  } catch (e) {
+    // Storage 실패는 500 이지만 원인은 클라이언트에도 노출 (env 미설정, bucket 없음 등).
+    const msg = e instanceof Error ? e.message : 'Storage 오류';
+    throw new APIError(500, 'internal_error', `Storage: ${msg}`);
+  }
 
   // Storage 는 아직 파일 없음 — url 은 미리 넣어두지만 status 는 AWAITING_UPLOAD.
   // 클라가 PUT 완료 후 PATCH 로 READY 전환.
