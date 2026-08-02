@@ -13,5 +13,7 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: health 핑
+      - name: health 핑 (API 함수)
         run: curl -fsS --max-time 30 https://jitda-epl2.vercel.app/api/v1/health
+      - name: home 핑 (SSR 함수)
+        run: curl -fsS --max-time 30 https://jitda-epl2.vercel.app/
