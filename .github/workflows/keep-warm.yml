@@ -1,0 +1,17 @@
+name: keep-warm
+
+# Vercel Hobby 콜드 스타트 방지 - 5분마다 health 엔드포인트 핑.
+# GitHub Actions 스케줄러 실제 지연 5~15분 있어 완벽하진 않지만 대부분의 콜드 회피.
+# 저장소 60일간 무활동 시 비활성화 (개발 중이면 무관).
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: health 핑
+        run: curl -fsS --max-time 30 https://jitda-epl2.vercel.app/api/v1/health
