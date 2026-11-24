@@ -9,6 +9,7 @@ import { zodErrorToFields, zPrefixedId } from '@/lib/schemas/common';
 import { resolveTagIds } from '@/lib/tags';
 import { toPostDTO } from '@/lib/mappers';
 import { requireUser, getSessionFromRequest } from '@/lib/auth/session';
+import { revalidateHome } from '@/lib/home-cache';
 
 export const runtime = 'nodejs';
 
@@ -109,6 +110,7 @@ export const PATCH = withErrors(async (req: NextRequest, ctx: { params: Promise<
     }
   });
 
+  revalidateHome();
   return jsonOk(await assembleDTO(id));
 });
 
@@ -121,5 +123,6 @@ export const DELETE = withErrors(async (req: NextRequest, ctx: { params: Promise
   if (p.deletedAt) throw notFound();
   assertOwner(p.authorId, user.id);
   await db.post.update({ where: { id }, data: { deletedAt: new Date() } });
+  revalidateHome();
   return jsonNoContent();
 });

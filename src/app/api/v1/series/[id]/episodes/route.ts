@@ -11,6 +11,7 @@ import { toEpisodeSummary } from '@/lib/mappers';
 import { encodeCursor, decodeCursor } from '@/lib/cursor';
 import { requireUser } from '@/lib/auth/session';
 import type { Prisma } from '@prisma/client';
+import { revalidateHome } from '@/lib/home-cache';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 28+ 이미지 첨부 회차 처리 여유
@@ -185,6 +186,7 @@ export const POST = withErrors(async (req: NextRequest, ctx: { params: Promise<{
   ]);
 
   // toEpisodeDTO 는 별도로 세팅
+  revalidateHome();
   return jsonCreated({
     id: episode.id,
     series_id: episode.seriesId,

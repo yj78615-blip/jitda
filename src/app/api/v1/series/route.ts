@@ -9,6 +9,7 @@ import { toSeriesDTO, type SeriesDTO } from '@/lib/mappers';
 import { encodeCursor, decodeCursor } from '@/lib/cursor';
 import { requireUser, getSessionFromRequest } from '@/lib/auth/session';
 import type { Prisma } from '@prisma/client';
+import { revalidateHome } from '@/lib/home-cache';
 
 export const runtime = 'nodejs';
 
@@ -152,6 +153,7 @@ export const POST = withErrors(async (req: NextRequest) => {
     },
   });
 
+  revalidateHome();
   return jsonCreated(
     toSeriesDTO({
       s: created,

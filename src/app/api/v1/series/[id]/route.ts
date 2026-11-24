@@ -9,6 +9,7 @@ import { zodErrorToFields, zPrefixedId } from '@/lib/schemas/common';
 import { resolveTagIds } from '@/lib/tags';
 import { toSeriesDTO } from '@/lib/mappers';
 import { requireUser, getSessionFromRequest } from '@/lib/auth/session';
+import { revalidateHome } from '@/lib/home-cache';
 
 export const runtime = 'nodejs';
 
@@ -134,6 +135,7 @@ export const PATCH = withErrors(async (req: NextRequest, ctx: { params: Promise<
     where: { seriesId: id, isSubscriberOnly: true, deletedAt: null },
   });
 
+  revalidateHome();
   return jsonOk(
     toSeriesDTO({
       s: updated,
@@ -166,5 +168,6 @@ export const DELETE = withErrors(async (req: NextRequest, ctx: { params: Promise
     db.series.update({ where: { id }, data: { deletedAt: now } }),
     db.episode.updateMany({ where: { seriesId: id, deletedAt: null }, data: { deletedAt: now } }),
   ]);
+  revalidateHome();
   return jsonNoContent();
 });

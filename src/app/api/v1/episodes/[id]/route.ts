@@ -8,6 +8,7 @@ import { UpdateEpisodeSchema } from '@/lib/schemas/episode';
 import { zodErrorToFields, zPrefixedId } from '@/lib/schemas/common';
 import { toEpisodeDTO } from '@/lib/mappers';
 import { requireUser, getSessionFromRequest } from '@/lib/auth/session';
+import { revalidateHome } from '@/lib/home-cache';
 
 export const runtime = 'nodejs';
 
@@ -138,6 +139,7 @@ export const PATCH = withErrors(async (req: NextRequest, ctx: { params: Promise<
     select: { id: true, url: true, order: true, width: true, height: true, fileSize: true },
   });
   const nav = await getNavigation(updated.seriesId, updated.order);
+  revalidateHome();
   return jsonOk(toEpisodeDTO(updated, images, nav));
 });
 
@@ -163,5 +165,6 @@ export const DELETE = withErrors(async (req: NextRequest, ctx: { params: Promise
       },
     }),
   ]);
+  revalidateHome();
   return jsonNoContent();
 });

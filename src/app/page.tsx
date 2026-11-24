@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { unstable_cache } from 'next/cache';
 import { db } from '@/lib/db';
+import { HOME_TAG } from '@/lib/home-cache';
 import { GENRES, isGenreSlug, type GenreSlug } from '@/lib/genres';
-import type { Prisma } from '@prisma/client';
 
 const GENRE_BASE: Record<string, [string, string]> = {
   romance: ['#ff9db6', '#e83e5c'], fantasy: ['#9d7cff', '#4a3fa8'],
@@ -41,9 +42,10 @@ function fmt(n: number): string {
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
   return String(n);
 }
-function relTime(d: Date | null): string {
+// 캐시를 거친 날짜는 문자열이라 여기서 되살린다.
+function relTime(d: Date | string | null): string {
   if (!d) return '';
-  const min = Math.max(0, (Date.now() - d.getTime()) / 60_000);
+  const min = Math.max(0, (Date.now() - new Date(d).getTime()) / 60_000);
   if (min < 60) return `${Math.floor(min)}분 전`;
   if (min < 60*24) return `${Math.floor(min/60)}시간 전`;
   if (min < 60*24*7) return `${Math.floor(min/60/24)}일 전`;
@@ -51,6 +53,51 @@ function relTime(d: Date | null): string {
 }
 
 type Tab = 'series' | 'posts' | 'latest';
+
+const authorSel = { select: { handle: true, displayName: true } } as const;
+const tagsSel = { include: { tag: { select: { slug: true, isGenre: true } } } } as const;
+const genreWhere = (genre: GenreSlug | null) =>
+  genre ? { tags: { some: { tag: { slug: genre, isGenre: true } } } } : {};
+
+// 작품·포스트·회차를 바꾸는 API 가 revalidateHome() 으로 즉시 비운다. 60초는 조회수·예약 공개용.
+const cacheOpts = { tags: [HOME_TAG], revalidate: 60 };
+
+const loadPopularSeries = unstable_cache(
+  async (genre: GenreSlug | null) => db.series.findMany({
+    where: { deletedAt: null, isAdult: false, ...genreWhere(genre) },
+    orderBy: [{ viewsTotal: 'desc' }, { id: 'desc' }],
+    take: 10,
+    include: { author: authorSel, tags: tagsSel },
+  }), ['home-series'], cacheOpts);
+
+const loadPopularPosts = unstable_cache(
+  async (genre: GenreSlug | null) => db.post.findMany({
+    where: {
+      deletedAt: null, isAdult: false,
+      publishedAt: { not: null, lte: new Date() },
+      ...genreWhere(genre),
+    },
+    orderBy: [{ viewsCount: 'desc' }, { id: 'desc' }],
+    take: 10,
+    include: { author: authorSel, tags: tagsSel },
+  }), ['home-posts'], cacheOpts);
+
+const loadLatestSeries = unstable_cache(
+  async (genre: GenreSlug | null) => db.series.findMany({
+    where: { deletedAt: null, isAdult: false, ...genreWhere(genre) },
+    orderBy: [{ updatedAt: 'desc' }],
+    take: 3,
+    include: {
+      author: authorSel,
+      tags: tagsSel,
+      episodes: {
+        where: { deletedAt: null, publishedAt: { not: null, lte: new Date() } },
+        orderBy: { order: 'desc' },
+        take: 1,
+        select: { id: true, order: true, publishedAt: true },
+      },
+    },
+  }), ['home-latest'], cacheOpts);
 
 export default async function Home({
   searchParams,
@@ -61,46 +108,10 @@ export default async function Home({
   const tab: Tab = sp.tab === 'posts' || sp.tab === 'latest' ? sp.tab : 'series';
   const activeGenre: GenreSlug | null = sp.genre && isGenreSlug(sp.genre) ? sp.genre : null;
 
-  const genreFilter: Prisma.SeriesWhereInput['tags'] | undefined = activeGenre
-    ? { some: { tag: { slug: activeGenre, isGenre: true } } }
-    : undefined;
-
-  const authorSel = { select: { handle: true, displayName: true } };
-  const tagsSel = { include: { tag: { select: { slug: true, isGenre: true } } } };
-
-  const [popularSeries, popularPosts, latestSeries] = await Promise.all([
-    db.series.findMany({
-      where: { deletedAt: null, isAdult: false, ...(genreFilter ? { tags: genreFilter } : {}) },
-      orderBy: [{ viewsTotal: 'desc' }, { id: 'desc' }],
-      take: 10,
-      include: { author: authorSel, tags: tagsSel },
-    }),
-    db.post.findMany({
-      where: {
-        deletedAt: null, isAdult: false,
-        publishedAt: { not: null, lte: new Date() },
-        ...(activeGenre ? { tags: { some: { tag: { slug: activeGenre, isGenre: true } } } } : {}),
-      },
-      orderBy: [{ viewsCount: 'desc' }, { id: 'desc' }],
-      take: 10,
-      include: { author: authorSel, tags: tagsSel },
-    }),
-    db.series.findMany({
-      where: { deletedAt: null, isAdult: false, ...(genreFilter ? { tags: genreFilter } : {}) },
-      orderBy: [{ updatedAt: 'desc' }],
-      take: 3,
-      include: {
-        author: authorSel,
-        tags: tagsSel,
-        episodes: {
-          where: { deletedAt: null, publishedAt: { not: null, lte: new Date() } },
-          orderBy: { order: 'desc' },
-          take: 1,
-          select: { id: true, order: true, publishedAt: true },
-        },
-      },
-    }),
-  ]);
+  // 보이는 탭만 조회한다 (DB 연결 1개로 줄 서지 않게).
+  const popularSeries = tab === 'series' ? await loadPopularSeries(activeGenre) : [];
+  const popularPosts = tab === 'posts' ? await loadPopularPosts(activeGenre) : [];
+  const latestSeries = tab === 'latest' ? await loadLatestSeries(activeGenre) : [];
 
   const hrefWith = (params: Record<string, string | null>) => {
     const cur = new URLSearchParams();
@@ -196,15 +207,6 @@ export default async function Home({
 }
 
 type SeriesRow = Awaited<ReturnType<typeof loadPopularSeries>>[number];
-// Type helper — never actually called, just for inference
-async function loadPopularSeries() {
-  return db.series.findMany({
-    include: {
-      author: { select: { handle: true, displayName: true } },
-      tags: { include: { tag: { select: { slug: true, isGenre: true } } } },
-    },
-  });
-}
 
 function SeriesRankCard({ s, rank }: { s: SeriesRow; rank: number }) {
   const genre = s.tags.find((t) => t.tag.isGenre)?.tag.slug;
@@ -232,14 +234,6 @@ function SeriesRankCard({ s, rank }: { s: SeriesRow; rank: number }) {
 }
 
 type PostRow = Awaited<ReturnType<typeof loadPopularPosts>>[number];
-async function loadPopularPosts() {
-  return db.post.findMany({
-    include: {
-      author: { select: { handle: true, displayName: true } },
-      tags: { include: { tag: { select: { slug: true, isGenre: true } } } },
-    },
-  });
-}
 
 function PostRankCard({ p, rank }: { p: PostRow; rank: number }) {
   const genre = p.tags.find((t) => t.tag.isGenre)?.tag.slug;
