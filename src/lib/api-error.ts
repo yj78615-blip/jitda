@@ -74,7 +74,7 @@ export function jsonNoContent(init?: ResponseInit) {
 
 // APIError → JSON 응답
 export function jsonError(err: unknown) {
-  if (err instanceof APIError) {
+  if (err instanceof APIError && err.code !== 'internal_error') {
     const body: {
       error: { code: string; message: string; details?: ErrorDetails };
     } = { error: { code: err.code, message: err.message } };
@@ -86,12 +86,10 @@ export function jsonError(err: unknown) {
     }
     return NextResponse.json(body, { status: err.status, headers });
   }
-  // 알 수 없는 에러 → 500. MVP 진단을 위해 원인 문자열을 응답에 포함.
-  // ponytail: 프로덕션 안정화 후 프로덕션에서는 일반 메시지로 되돌리기.
+  // 내부 에러 → 500. 원인은 서버 로그에만 남기고 응답에는 싣지 않는다.
   console.error('[unhandled]', err);
-  const detail = err instanceof Error ? err.message : String(err);
   return NextResponse.json(
-    { error: { code: 'internal_error', message: `서버 오류: ${detail}` } },
+    { error: { code: 'internal_error', message: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' } },
     { status: 500 }
   );
 }

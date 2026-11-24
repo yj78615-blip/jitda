@@ -46,7 +46,6 @@ export const GET = withErrors(async (req: NextRequest) => {
   // Cursor 는 (sortValue, id) 튜플로 filtering
   if (decoded) {
     const k = decoded.k;
-    const op: 'lt' | 'lte' = 'lte'; // tie-break id 로 정확히 커팅
     // sortValue 가 같으면 id 로 tie-break
     where.OR = [
       { [cursorField]: { lt: cursorField === 'viewsTotal' ? Number(k) : new Date(k as string) } },
@@ -55,8 +54,6 @@ export const GET = withErrors(async (req: NextRequest) => {
         id: { lt: decoded.i },
       },
     ] as Prisma.SeriesWhereInput['OR'];
-    // remove the naive lte
-    void op;
   }
 
   // fetch + 1 로 has_more 판정

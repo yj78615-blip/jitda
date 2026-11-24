@@ -196,7 +196,6 @@ export default async function Home({
         <div className="container">
           <div>© 2026 IF · <span style={{ color: 'var(--accent)', fontWeight: 600 }}>LIVE</span></div>
           <div className="footer-links">
-            <Link href="/search">검색</Link>
             <Link href="/studio">스튜디오</Link>
             <Link href="/auth">로그인</Link>
           </div>

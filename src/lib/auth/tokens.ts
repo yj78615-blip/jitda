@@ -35,7 +35,7 @@ export async function signAccessToken(claims: AccessTokenClaims): Promise<string
 export async function verifyAccessToken(token: string): Promise<AccessTokenClaims> {
   const { payload } = await jwtVerify(token, ACCESS_SECRET(), { issuer: ISSUER() });
   if (typeof payload.sub !== 'string') throw new Error('sub missing');
-  if (payload.role !== 'USER' && payload.role !== 'ADMIN') throw new Error('role missing');
+  if (payload.role !== 'USER' && payload.role !== 'CREATOR' && payload.role !== 'ADMIN') throw new Error('role missing');
   if (typeof payload.handle !== 'string') throw new Error('handle missing');
   return { sub: payload.sub, role: payload.role, handle: payload.handle };
 }
