@@ -61,7 +61,7 @@ export default function EpisodeViewerPage({ params }: { params: Promise<{ id: st
 
         const seriesRes = await fetch(`/api/v1/series/${ep.series_id}`);
         if (seriesRes.ok) {
-          const s = await seriesRes.json() as SeriesInfo;
+          const { series: s } = await seriesRes.json() as { series: SeriesInfo };
           setSeries(s);
         }
 
