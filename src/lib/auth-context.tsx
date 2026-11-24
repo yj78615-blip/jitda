@@ -28,23 +28,29 @@ export interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-const STORAGE_KEY = 'jitda_access_token';
+// 액세스 토큰은 메모리에만 둔다 (보안 명세 §3.3). 새로고침하면 refresh 쿠키로 복원.
+let accessToken: string | null = null;
 
-function getStoredToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
+// refresh 토큰은 1회용이라 탭끼리 겹쳐 쓰면 한쪽이 죽는다. 쿠키를 바꾸는 요청은 탭 간에 줄 세운다.
+function withAuthLock<T>(fn: () => Promise<T>): Promise<T> {
+  // ponytail: Web Locks 미지원 환경은 잠금 없이 진행 (서버 유예가 받쳐준다)
+  if (!navigator.locks) return fn();
+  return navigator.locks.request('jitda_auth', fn) as Promise<T>;
 }
 
-function setStoredToken(token: string | null) {
-  if (typeof window === 'undefined') return;
-  try {
-    if (token) localStorage.setItem(STORAGE_KEY, token);
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch { /* noop */ }
+// 같은 탭의 동시 호출(StrictMode 이중 effect 등)은 요청 하나를 공유한다.
+let inflight: Promise<AuthUser | null> | null = null;
+
+function refreshSession(): Promise<AuthUser | null> {
+  inflight ??= withAuthLock(async () => {
+    accessToken = null;
+    const res = await fetch('/api/v1/auth/refresh', { method: 'POST' });
+    if (!res.ok) return null;
+    const data = await res.json() as { access_token: string; user: AuthUser };
+    accessToken = data.access_token;
+    return data.user;
+  }).catch(() => null).finally(() => { inflight = null; });
+  return inflight;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -52,54 +58,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 부팅 시 세션 복원: refresh 왕복 1회.
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
+    // 예전 버전이 localStorage 에 남긴 토큰 제거
+    try { localStorage.removeItem('jitda_access_token'); } catch { /* noop */ }
+
+    let cancelled = false;
+    refreshSession().then((u) => {
+      if (cancelled) return;
+      setUser(u);
       setLoading(false);
-      return;
-    }
-    fetch('/api/v1/auth/me', {
-      headers: { authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('session expired');
-        return res.json() as Promise<{ user: AuthUser }>;
-      })
-      .then((data) => {
-        setUser(data.user);
-      })
-      .catch(() => {
-        setStoredToken(null);
-        return fetch('/api/v1/auth/refresh', { method: 'POST' })
-          .then((r) => {
-            if (!r.ok) throw new Error('refresh failed');
-            return r.json() as Promise<{ access_token: string }>;
-          })
-          .then((data) => {
-            setStoredToken(data.access_token);
-            return fetch('/api/v1/auth/me', {
-              headers: { authorization: `Bearer ${data.access_token}` },
-            });
-          })
-          .then((r) => {
-            if (!r.ok) throw new Error('me failed');
-            return r.json() as Promise<{ user: AuthUser }>;
-          })
-          .then((data) => setUser(data.user))
-          .catch(() => setUser(null));
-      })
-      .finally(() => setLoading(false));
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch('/api/v1/auth/login', {
+    const res = await withAuthLock(() => fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
-    });
+    }));
     const data = await res.json() as { access_token?: string; user?: AuthUser; error?: { message: string } };
     if (!res.ok) throw new Error(data.error?.message ?? '로그인에 실패했습니다.');
-    setStoredToken(data.access_token!);
+    accessToken = data.access_token!;
     setUser(data.user ?? null);
   }, [router]);
 
@@ -123,22 +104,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [login]);
 
   const logout = useCallback(async () => {
-    await fetch('/api/v1/auth/logout', { method: 'POST' }).catch(() => {});
-    setStoredToken(null);
+    await withAuthLock(() => fetch('/api/v1/auth/logout', { method: 'POST' })).catch(() => {});
+    accessToken = null;
     setUser(null);
     router.push('/');
     router.refresh();
   }, [router]);
 
   const refresh = useCallback(async () => {
-    const res = await fetch('/api/v1/auth/refresh', { method: 'POST' });
-    if (!res.ok) {
-      setStoredToken(null);
-      setUser(null);
-      return;
-    }
-    const data = await res.json() as { access_token: string };
-    setStoredToken(data.access_token);
+    setUser(await refreshSession());
   }, []);
 
   return (
@@ -155,5 +129,5 @@ export function useAuth(): AuthState {
 }
 
 export function getAccessToken(): string | null {
-  return getStoredToken();
+  return accessToken;
 }
