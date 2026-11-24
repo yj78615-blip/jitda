@@ -257,7 +257,7 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: 240px 1fr;
 }
 @media (max-width: 900px) {
-  .studio-page { grid-template-columns: 1fr; }
+  .studio-page { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
 }
 
 .studio-sidebar {
@@ -1027,6 +1027,14 @@ a { color: inherit; text-decoration: none; }
 .global-user-nav .btn-ghost { color: var(--ink-2); }
 .global-user-nav .btn-logout { color: var(--muted); }
 .global-user-nav .btn-primary { background: var(--ink); color: var(--paper); }
+/* 뷰어는 자체 상단바가 있고, 겹치면 목록 버튼을 가린다 */
+body:has(.viewer-app) .global-user-nav { display: none; }
+/* 좁은 화면: 메뉴·검색창을 가리지 않게 고정을 풀고 윗줄에 둔다 */
+@media (max-width: 900px) {
+  .global-user-nav {
+    position: static; justify-content: flex-end; padding: 8px 12px;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .author-panel, .author-modal-backdrop, .author-modal, .author-toast {
