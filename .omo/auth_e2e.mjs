@@ -14,7 +14,7 @@ for(const u of ['/auth','/studio','/profile?handle=demo'])await page.request.get
 const login=async()=>{await page.goto(B+'/auth');await settled(page);await page.fill('input[type=email]',email);await page.fill('input[type=password]',pw);await page.click('form button[type=submit]');await page.waitForURL(B+'/',{timeout:40000});};
 await login(); ok('로그인', await inn(page));
 await page.evaluate(()=>localStorage.setItem('jitda_access_token','old'));
-const reqs=[];const l=r=>{if(r.url().includes('/auth/'))reqs.push(r.url().split('/auth/')[1]);};page.on('request',l);
+const reqs=[];const l=r=>{if(r.url().includes('/api/v1/auth/'))reqs.push(r.url().split('/auth/')[1]);};page.on('request',l);
 await page.reload(); ok('새로고침 유지', await inn(page)); page.off('request',l);
 ok('refresh 1회만', reqs.join()==='refresh', reqs.join());
 ok('저장소에 토큰 없음', await page.evaluate(()=>!JSON.stringify([{...localStorage},{...sessionStorage}]).match(/eyJ|jitda_access/)));
