@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import Link from 'next/link';
-import { useAuth, getAccessToken, type AuthUser } from '@/lib/auth-context';
+import { useAuth, authFetch, type AuthUser } from '@/lib/auth-context';
 import { uploadImage, IMAGE_ACCEPT } from '@/lib/upload-image';
 import { GENRES } from '@/lib/genres';
 import { useRouter } from 'next/navigation';
@@ -311,13 +311,10 @@ function WorksSection({
 
   const deleteSeries = async (id: string, title: string) => {
     if (!confirm(`"${title}" 작품 전체를 삭제하시겠어요? 회차·이미지도 함께 사라지고 되돌릴 수 없습니다.`)) return;
-    const token = getAccessToken();
-    if (!token) { setDeleteError('로그인이 필요합니다.'); return; }
     setDeletingId(id); setDeleteError(null);
     try {
-      const res = await fetch(`/api/v1/series/${id}`, {
+      const res = await authFetch(`/api/v1/series/${id}`, {
         method: 'DELETE',
-        headers: { authorization: `Bearer ${token}` },
       });
       if (!res.ok && res.status !== 204) {
         const err = await res.json().catch(() => ({}));
@@ -513,13 +510,10 @@ function EpisodeManagePanel({ seriesId }: { seriesId: string }) {
 
   const deleteEpisode = async (id: string, title: string) => {
     if (!confirm(`"${title}" 회차를 삭제하시겠어요? 되돌릴 수 없습니다.`)) return;
-    const token = getAccessToken();
-    if (!token) { setError('로그인이 필요합니다.'); return; }
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/v1/episodes/${id}`, {
+      const res = await authFetch(`/api/v1/episodes/${id}`, {
         method: 'DELETE',
-        headers: { authorization: `Bearer ${token}` },
       });
       if (!res.ok && res.status !== 204) {
         const err = await res.json().catch(() => ({}));
@@ -654,19 +648,17 @@ function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () =>
     setError(null); setOk(false);
     if (!title.trim()) { setError('제목을 입력해주세요.'); return; }
     if (genres.length === 0) { setError('장르를 1개 이상 선택해주세요.'); return; }
-    const token = getAccessToken();
-    if (!token) { setError('로그인이 필요합니다.'); return; }
 
     setSubmitting(true);
     try {
       let coverId = cover?.id;
       if (cover && !coverId) {
-        coverId = await uploadImage(cover.file, 'series_cover', token);
+        coverId = await uploadImage(cover.file, 'series_cover');
         setCover({ ...cover, id: coverId });
       }
-      const res = await fetch(initial ? `/api/v1/series/${initial.id}` : '/api/v1/series', {
+      const res = await authFetch(initial ? `/api/v1/series/${initial.id}` : '/api/v1/series', {
         method: initial ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
           // 편집에서는 빈 문자열을 보내야 소개가 지워진다
@@ -836,8 +828,6 @@ function NewEpisodeForm({
     if (!seriesId) { setError('시리즈를 선택해주세요.'); return; }
     if (!title.trim()) { setError('회차 제목을 입력해주세요.'); return; }
     if (files.length === 0) { setError('이미지를 최소 1장 이상 선택해주세요.'); return; }
-    const token = getAccessToken();
-    if (!token) { setError('로그인이 필요합니다.'); return; }
 
     setSubmitting(true);
     setProgress(`0/${files.length} 업로드 준비 중...`);
@@ -847,12 +837,12 @@ function NewEpisodeForm({
         const f = files[i]!.file;
         setProgress(`${i + 1}/${files.length} 업로드 중 (${f.name})...`);
 
-        imageIds.push(await uploadImage(f, 'episode_page', token));
+        imageIds.push(await uploadImage(f, 'episode_page'));
       }
       setProgress(`${files.length}/${files.length} 회차 생성 중...`);
-      const res = await fetch(`/api/v1/series/${seriesId}/episodes`, {
+      const res = await authFetch(`/api/v1/series/${seriesId}/episodes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), image_ids: imageIds }),
       });
       if (!res.ok) {

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, getAccessToken } from '@/lib/auth-context';
+import { useAuth, authFetch } from '@/lib/auth-context';
 
 /* ================================================================
    AuthorHeroActions — 팔로우/구독/후원 버튼 + 모달
@@ -28,9 +28,7 @@ export default function AuthorHeroActions({ authorId, displayName, handle, subsc
 
   useEffect(() => {
     if (authLoading || !user) return;
-    const token = getAccessToken();
-    if (!token) return;
-    fetch(`/api/v1/follow/${authorId}`, { headers: { authorization: `Bearer ${token}` } })
+    authFetch(`/api/v1/follow/${authorId}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (d) setFollowing(d.following); })
       .catch(() => {});
@@ -43,16 +41,14 @@ export default function AuthorHeroActions({ authorId, displayName, handle, subsc
 
   const toggleFollow = useCallback(async () => {
     if (!user) { router.push('/auth?redirect=/@' + handle); return; }
-    const token = getAccessToken();
-    if (!token) { router.push('/auth?redirect=/@' + handle); return; }
 
     setFollowLoading(true);
     try {
       const method = following ? 'DELETE' : 'POST';
-      const res = await fetch(`/api/v1/follow/${authorId}`, {
+      const res = await authFetch(`/api/v1/follow/${authorId}`, {
         method,
-        headers: { authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) { router.push('/auth?redirect=/@' + handle); return; }
       if (!res.ok) { showToast('잠시 후 다시 시도해주세요'); return; }
       if (following) { setFollowing(false); showToast('팔로우를 취소했습니다'); }
       else { setFollowing(true); showToast(`${displayName}님을 팔로우합니다`); }

@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, getAccessToken } from '@/lib/auth-context';
+import { useAuth, authFetch } from '@/lib/auth-context';
 import { uploadImage } from '@/lib/upload-image';
 
 interface EpisodeDTO {
@@ -108,8 +108,6 @@ export default function EditEpisodePage({ params }: { params: Promise<{ id: stri
     setError(null); setOk(false);
     if (!title.trim()) { setError('회차 제목을 입력해주세요.'); return; }
     if (items.length === 0) { setError('이미지를 최소 1장 이상 남겨주세요.'); return; }
-    const token = getAccessToken();
-    if (!token) { setError('로그인이 필요합니다.'); return; }
 
     setSubmitting(true);
     setProgress('업로드 준비...');
@@ -124,13 +122,13 @@ export default function EditEpisodePage({ params }: { params: Promise<{ id: stri
         }
         stagedIdx += 1;
         setProgress(`새 이미지 ${stagedIdx}/${stagedTotal} 업로드 (${it.file.name})...`);
-        imageIds.push(await uploadImage(it.file, 'episode_page', token));
+        imageIds.push(await uploadImage(it.file, 'episode_page'));
       }
 
       setProgress('회차 저장 중...');
-      const res = await fetch(`/api/v1/episodes/${episodeId}`, {
+      const res = await authFetch(`/api/v1/episodes/${episodeId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim(), image_ids: imageIds }),
       });
       if (!res.ok) {
