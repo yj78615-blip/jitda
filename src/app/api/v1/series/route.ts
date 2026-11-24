@@ -10,6 +10,7 @@ import { encodeCursor, decodeCursor } from '@/lib/cursor';
 import { requireUser, getSessionFromRequest } from '@/lib/auth/session';
 import type { Prisma } from '@prisma/client';
 import { revalidateHome } from '@/lib/home-cache';
+import { withCovers } from '@/lib/covers';
 
 export const runtime = 'nodejs';
 
@@ -69,7 +70,7 @@ export const GET = withErrors(async (req: NextRequest) => {
   });
 
   const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  const page = await withCovers(hasMore ? rows.slice(0, limit) : rows);
 
   // subscribers_only_count 는 배치로 (N+1 방지)
   const seriesIds = page.map((s) => s.id);
@@ -89,6 +90,7 @@ export const GET = withErrors(async (req: NextRequest) => {
       tags: s.tags.map((t) => t.tag),
       episodeCount: s._count.episodes,
       subscribersOnlyCount: subOnlyMap.get(s.id) ?? 0,
+      cover: s.cover,
     })
   );
 
@@ -158,6 +160,7 @@ export const POST = withErrors(async (req: NextRequest) => {
       tags: created.tags.map((t) => t.tag),
       episodeCount: created._count.episodes,
       subscribersOnlyCount: 0,
+      cover: (await withCovers([created]))[0]!.cover,
     })
   );
 });

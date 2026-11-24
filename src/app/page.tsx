@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { unstable_cache } from 'next/cache';
 import { db } from '@/lib/db';
+import { withCovers } from '@/lib/covers';
+import CoverImg from '@/components/cover-img';
 import { HOME_TAG } from '@/lib/home-cache';
 import { GENRES, isGenreSlug, type GenreSlug } from '@/lib/genres';
 
@@ -63,12 +65,12 @@ const genreWhere = (genre: GenreSlug | null) =>
 const cacheOpts = { tags: [HOME_TAG], revalidate: 60 };
 
 const loadPopularSeries = unstable_cache(
-  async (genre: GenreSlug | null) => db.series.findMany({
+  async (genre: GenreSlug | null) => withCovers(await db.series.findMany({
     where: { deletedAt: null, isAdult: false, ...genreWhere(genre) },
     orderBy: [{ viewsTotal: 'desc' }, { id: 'desc' }],
     take: 10,
     include: { author: authorSel, tags: tagsSel },
-  }), ['home-series'], cacheOpts);
+  })), ['home-series'], cacheOpts);
 
 const loadPopularPosts = unstable_cache(
   async (genre: GenreSlug | null) => db.post.findMany({
@@ -83,7 +85,7 @@ const loadPopularPosts = unstable_cache(
   }), ['home-posts'], cacheOpts);
 
 const loadLatestSeries = unstable_cache(
-  async (genre: GenreSlug | null) => db.series.findMany({
+  async (genre: GenreSlug | null) => withCovers(await db.series.findMany({
     where: { deletedAt: null, isAdult: false, ...genreWhere(genre) },
     orderBy: [{ updatedAt: 'desc' }],
     take: 3,
@@ -97,7 +99,7 @@ const loadLatestSeries = unstable_cache(
         select: { id: true, order: true, publishedAt: true },
       },
     },
-  }), ['home-latest'], cacheOpts);
+  })), ['home-latest'], cacheOpts);
 
 export default async function Home({
   searchParams,
@@ -215,6 +217,7 @@ function SeriesRankCard({ s, rank }: { s: SeriesRow; rank: number }) {
   return (
     <Link className="rank-card" href={`/series/${s.id}`} style={{ ['--g1' as string]: g1, ['--g2' as string]: g2 } as React.CSSProperties}>
       <div className="thumb">
+        <CoverImg url={s.cover?.url} />
         <span className="rank-num">{String(rank).padStart(2, '0')}</span>
         {badge}
         <span className="thumb-title">{s.title}</span>
@@ -267,6 +270,7 @@ function LatestCard({ s }: { s: LatestRow }) {
   return (
     <Link className="feature-card" href={`/series/${s.id}`} style={{ ['--g1' as string]: g1, ['--g2' as string]: g2 } as React.CSSProperties}>
       <div className="thumb">
+        <CoverImg url={s.cover?.url} />
         <span className="feature-tag">{isNew ? '신작' : '업데이트'}</span>
         <span className="feature-time">{relTime(publishedAt)}</span>
         <span className="feature-thumb-title">{s.title}</span>

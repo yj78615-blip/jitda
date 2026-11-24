@@ -10,6 +10,7 @@ import { resolveTagIds } from '@/lib/tags';
 import { toSeriesDTO } from '@/lib/mappers';
 import { requireUser, getSessionFromRequest } from '@/lib/auth/session';
 import { revalidateHome } from '@/lib/home-cache';
+import { withCovers } from '@/lib/covers';
 
 export const runtime = 'nodejs';
 
@@ -60,6 +61,7 @@ export const GET = withErrors(async (req: NextRequest, ctx: { params: Promise<{ 
       tags: s.tags.map((t) => t.tag),
       episodeCount: s._count.episodes,
       subscribersOnlyCount: subOnly,
+      cover: (await withCovers([s]))[0]!.cover,
     }),
     viewer: { is_subscribed_to_author: isSubscribedToAuthor },
   });
@@ -146,6 +148,7 @@ export const PATCH = withErrors(async (req: NextRequest, ctx: { params: Promise<
       tags: updated.tags.map((t) => t.tag),
       episodeCount: updated._count.episodes,
       subscribersOnlyCount: subOnly,
+      cover: (await withCovers([updated]))[0]!.cover,
     })
   );
 });

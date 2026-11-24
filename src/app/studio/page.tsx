@@ -3,13 +3,16 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import { useAuth, getAccessToken, type AuthUser } from '@/lib/auth-context';
+import { uploadImage, IMAGE_ACCEPT } from '@/lib/upload-image';
 import { GENRES } from '@/lib/genres';
 import { useRouter } from 'next/navigation';
+import CoverImg from '@/components/cover-img';
 
 /* ---------- types ---------- */
 interface SeriesItem {
   id: string; title: string; status: string; episode_count: number;
   description?: string | null; genres?: string[];
+  cover_image?: { url: string } | null;
   stats: { views_total: number; likes_total: number; subscribers_only_count: number };
   updated_at: string; created_at: string;
 }
@@ -397,7 +400,7 @@ function WorksSection({
                     <tr>
                       <td>
                         <div className="studio-table-title-cell">
-                          <div className="studio-table-thumb" />
+                          <div className="studio-table-thumb"><CoverImg url={s.cover_image?.url} /></div>
                           <div>
                             <Link href={`/series/${s.id}`} className="studio-table-title">{s.title}</Link>
                             <div className="studio-table-sub">{s.genres?.[0] || '기타'}</div>
@@ -632,6 +635,10 @@ function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () =>
   const [genres, setGenres] = useState<string[]>(initial?.genres ?? []);
   const [status, setStatus] = useState(initial?.status ?? 'ongoing');
   const fid = initial?.id ?? 'new';
+  // id: 업로드가 끝났으면 저장을 재시도해도 다시 올리지 않는다
+  const [cover, setCover] = useState<{ file: File; preview: string; id?: string } | null>(null);
+  const preview = cover?.preview;
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -652,6 +659,11 @@ function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () =>
 
     setSubmitting(true);
     try {
+      let coverId = cover?.id;
+      if (cover && !coverId) {
+        coverId = await uploadImage(cover.file, 'series_cover', token);
+        setCover({ ...cover, id: coverId });
+      }
       const res = await fetch(initial ? `/api/v1/series/${initial.id}` : '/api/v1/series', {
         method: initial ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
@@ -661,6 +673,7 @@ function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () =>
           description: initial ? description.trim() : description.trim() || undefined,
           genres,
           ...(initial ? { status } : {}),
+          ...(coverId ? { cover_image_id: coverId } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -668,8 +681,10 @@ function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () =>
       setOk(true);
       if (!initial) { setTitle(''); setDescription(''); setGenres([]); }
       await onSaved();
-    } catch {
-      setError('네트워크 오류. 잠시 후 다시 시도해주세요.');
+      setCover(null);
+    } catch (err) {
+      // uploadImage 가 던진 Error 는 안내 문구, TypeError 는 네트워크 실패
+      setError(err instanceof Error && err.name === 'Error' ? err.message : '네트워크 오류. 잠시 후 다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -709,6 +724,30 @@ function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () =>
             );
           })}
         </div>
+      </div>
+
+      <div>
+        <label htmlFor={`s-cover-${fid}`} className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+          커버 <span style={{ color: 'var(--muted)', fontSize: 11 }}>(3:4 권장, 20MB 이하)</span>
+        </label>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {(preview ?? initial?.cover_image?.url) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview ?? initial?.cover_image?.url} alt="커버 미리보기"
+              style={{ width: 72, height: 96, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+          )}
+          <input key={preview ?? 'empty'} id={`s-cover-${fid}`} type="file" accept={IMAGE_ACCEPT}
+            disabled={submitting} style={{ minWidth: 0, fontSize: 12 }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setCover({ file, preview: URL.createObjectURL(file) });
+            }} />
+        </div>
+        {cover && (
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, overflowWrap: 'anywhere' }}>
+            선택: {cover.file.name} (저장하면 적용됩니다)
+          </div>
+        )}
       </div>
 
       {initial && (
@@ -808,49 +847,7 @@ function NewEpisodeForm({
         const f = files[i]!.file;
         setProgress(`${i + 1}/${files.length} 업로드 중 (${f.name})...`);
 
-        // 1) 서명된 URL 발급
-        const initRes = await fetch('/api/v1/images/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            purpose: 'episode_page',
-            content_type: f.type,
-            file_size: f.size,
-          }),
-        });
-        if (!initRes.ok) {
-          const errData = await initRes.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `${f.name} 업로드 초기화 실패`);
-        }
-        const { image } = await initRes.json();
-
-        // 2) Supabase Storage 로 직접 PUT (Vercel body 제한 우회)
-        const putRes = await fetch(image.upload_url, {
-          method: 'PUT',
-          headers: { 'Content-Type': f.type },
-          body: f,
-        });
-        if (!putRes.ok) {
-          throw new Error(`${f.name} 스토리지 업로드 실패 (${putRes.status})`);
-        }
-
-        // 3) READY 로 전환
-        const readyRes = await fetch(`/api/v1/images/${image.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            status: 'READY',
-            url: image.public_url,
-            content_type: f.type,
-            file_size: f.size,
-          }),
-        });
-        if (!readyRes.ok) {
-          const errData = await readyRes.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || `${f.name} 상태 갱신 실패`);
-        }
-
-        imageIds.push(image.id);
+        imageIds.push(await uploadImage(f, 'episode_page', token));
       }
       setProgress(`${files.length}/${files.length} 회차 생성 중...`);
       const res = await fetch(`/api/v1/series/${seriesId}/episodes`, {

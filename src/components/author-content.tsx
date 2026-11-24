@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import CoverImg from '@/components/cover-img';
 import Link from 'next/link';
 import type { SeriesDTO, PostDTO } from '@/lib/mappers';
 
@@ -116,6 +117,7 @@ export default function AuthorContent({ authorId, authorName, series, subscripti
                         '--g2': '#333',
                       } as React.CSSProperties}
                     >
+                      <CoverImg url={s.cover_image?.url} />
                       {s.status === 'completed' && <span className="badge badge-end">완결</span>}
                       {s.status !== 'completed' && s.stats.subscribers_only_count > 0 && (
                         <span className="badge badge-sub">구독자 전용 회차</span>

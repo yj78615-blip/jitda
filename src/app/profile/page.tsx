@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { toSeriesDTO, type SeriesDTO } from '@/lib/mappers';
+import { withCovers } from '@/lib/covers';
 import AuthorContent from '@/components/author-content';
 import AuthorHeroActions from '@/components/author-hero-actions';
 
@@ -56,7 +57,7 @@ export default async function AuthorProfilePage({
 
   if (!author) notFound();
 
-  const seriesRows = await db.series.findMany({
+  const seriesRows = await withCovers(await db.series.findMany({
     where: { authorId: author.id, deletedAt: null },
     orderBy: { updatedAt: 'desc' },
     take: 20,
@@ -64,7 +65,7 @@ export default async function AuthorProfilePage({
       tags: { include: { tag: { select: { slug: true, isGenre: true } } } },
       _count: { select: { episodes: { where: { deletedAt: null } } } },
     },
-  });
+  }));
 
   const seriesIds = seriesRows.map((s) => s.id);
   const subOnlyGroups = seriesIds.length
@@ -89,7 +90,7 @@ export default async function AuthorProfilePage({
       tags: s.tags.map((t) => t.tag),
       episodeCount: s._count.episodes,
       subscribersOnlyCount: subOnlyMap.get(s.id) ?? 0,
-      cover: null,
+      cover: s.cover,
     })
   );
 

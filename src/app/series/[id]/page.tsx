@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
+import { withCovers } from '@/lib/covers';
+import CoverImg from '@/components/cover-img';
 
 export default async function SeriesDetailPage({
   params,
@@ -24,6 +26,7 @@ export default async function SeriesDetailPage({
   });
 
   if (!series) notFound();
+  const cover = (await withCovers([series]))[0]!.cover;
 
   const genreTag = series.tags.find((t) => t.tag.isGenre);
   const genreName = genreTag?.tag.nameKo ?? '기타';
@@ -57,6 +60,7 @@ export default async function SeriesDetailPage({
                 '--g1': '#6b5580',
                 '--g2': '#1a0e26',
               } as React.CSSProperties}>
+                <CoverImg url={cover?.url} />
                 <span className="series-thumb-label">{series.title}</span>
               </div>
             </div>

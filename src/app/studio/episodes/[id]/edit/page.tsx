@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, getAccessToken } from '@/lib/auth-context';
+import { uploadImage } from '@/lib/upload-image';
 
 interface EpisodeDTO {
   id: string;
@@ -123,41 +124,7 @@ export default function EditEpisodePage({ params }: { params: Promise<{ id: stri
         }
         stagedIdx += 1;
         setProgress(`새 이미지 ${stagedIdx}/${stagedTotal} 업로드 (${it.file.name})...`);
-        const initRes = await fetch('/api/v1/images/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            purpose: 'episode_page',
-            content_type: it.file.type,
-            file_size: it.file.size,
-          }),
-        });
-        if (!initRes.ok) {
-          const err = await initRes.json().catch(() => ({}));
-          throw new Error(err?.error?.message || `${it.file.name} 업로드 초기화 실패`);
-        }
-        const { image } = await initRes.json();
-        const putRes = await fetch(image.upload_url, {
-          method: 'PUT',
-          headers: { 'Content-Type': it.file.type },
-          body: it.file,
-        });
-        if (!putRes.ok) throw new Error(`${it.file.name} 스토리지 업로드 실패 (${putRes.status})`);
-        const readyRes = await fetch(`/api/v1/images/${image.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            status: 'READY',
-            url: image.public_url,
-            content_type: it.file.type,
-            file_size: it.file.size,
-          }),
-        });
-        if (!readyRes.ok) {
-          const err = await readyRes.json().catch(() => ({}));
-          throw new Error(err?.error?.message || `${it.file.name} 상태 갱신 실패`);
-        }
-        imageIds.push(image.id);
+        imageIds.push(await uploadImage(it.file, 'episode_page', token));
       }
 
       setProgress('회차 저장 중...');
