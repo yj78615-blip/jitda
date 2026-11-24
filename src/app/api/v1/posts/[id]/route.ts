@@ -77,7 +77,10 @@ export const PATCH = withErrors(async (req: NextRequest, ctx: { params: Promise<
 
   await db.$transaction(async (tx) => {
     if (tagsToApply) {
-      await tx.postTag.deleteMany({ where: { postId: id } });
+      // 보낸 종류만 교체한다 (장르만 고쳤을 때 자유 태그가 지워지지 않게)
+      await tx.postTag.deleteMany({
+        where: { postId: id, ...(body.genres && body.tags ? {} : { tag: { isGenre: !!body.genres } }) },
+      });
       if (tagsToApply.length) {
         await tx.postTag.createMany({
           data: tagsToApply.map((tagId) => ({ postId: id, tagId })),

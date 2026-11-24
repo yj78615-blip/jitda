@@ -15,6 +15,8 @@ interface SeriesItem {
 }
 interface SeriesListResp { items: SeriesItem[] }
 
+const STATUS_KO: Record<string, string> = { ongoing: '연재중', hiatus: '휴재', completed: '완결' };
+
 type Section = 'dashboard' | 'works' | 'upload' | 'payouts' | 'settings';
 type WorksTab = 'series' | 'posts';
 
@@ -218,7 +220,7 @@ function DashboardSection({
               <div className="studio-kpi-label"><span>작품 수</span></div>
               <div className="studio-kpi-value">{series.length}</div>
               <div className="studio-kpi-note">
-                {series.filter((s) => s.status === 'ONGOING').length}개 연재중
+                {series.filter((s) => s.status === 'ongoing').length}개 연재중
               </div>
             </div>
             <div className="studio-kpi">
@@ -273,7 +275,7 @@ function DashboardSection({
                           <span className="studio-tip-time">{relTime(s.updated_at)}</span>
                         </div>
                         <div className="studio-tip-msg">
-                          {s.status === 'COMPLETED' ? '완결' : '연재중'} · {s.episode_count}화
+                          {STATUS_KO[s.status] ?? s.status} · {s.episode_count}화
                         </div>
                       </div>
                     </div>
@@ -300,6 +302,7 @@ function WorksSection({
   onRefresh: () => Promise<void> | void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -402,8 +405,8 @@ function WorksSection({
                         </div>
                       </td>
                       <td>
-                        <span className={`studio-status-pill ${s.status === 'COMPLETED' ? 'completed' : 'ongoing'}`}>
-                          {s.status === 'COMPLETED' ? '완결' : '연재중'}
+                        <span className={`studio-status-pill ${s.status === 'completed' ? 'completed' : 'ongoing'}`}>
+                          {STATUS_KO[s.status] ?? s.status}
                         </span>
                       </td>
                       <td className="num">{s.episode_count}</td>
@@ -418,6 +421,13 @@ function WorksSection({
                           >
                             {expandedId === s.id ? '회차 접기' : '회차 관리'}
                           </button>
+                          <button
+                            className="studio-row-btn"
+                            aria-expanded={editingId === s.id}
+                            onClick={() => setEditingId(editingId === s.id ? null : s.id)}
+                          >
+                            {editingId === s.id ? '편집 접기' : '정보 편집'}
+                          </button>
                           <button className="studio-row-btn" onClick={() => onNav('upload')}>+ 새 회차</button>
                           <button
                             className="studio-row-btn"
@@ -430,6 +440,16 @@ function WorksSection({
                         </div>
                       </td>
                     </tr>
+                    {editingId === s.id && (
+                      <tr>
+                        <td colSpan={7} style={{ whiteSpace: 'normal' }}>
+                          {/* 표가 가로로 스크롤돼도 폼은 화면에 붙어 있게 */}
+                          <div style={{ position: 'sticky', left: 18, width: 'min(640px, calc(100vw - 40px))' }}>
+                            <SeriesForm initial={s} onSaved={onRefresh} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {expandedId === s.id && (
                       <tr>
                         <td colSpan={7} style={{ padding: 0 }}>
@@ -598,18 +618,20 @@ function UploadSection({
       </div>
 
       <div style={{ display: 'grid', gap: 24 }}>
-        <NewSeriesForm onCreated={onCreated} />
+        <SeriesForm onSaved={onCreated} />
         <NewEpisodeForm series={series} onCreated={onCreated} />
       </div>
     </>
   );
 }
 
-/* ---------- 새 시리즈 폼 ---------- */
-function NewSeriesForm({ onCreated }: { onCreated: () => Promise<void> | void }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [genres, setGenres] = useState<string[]>([]);
+/* ---------- 시리즈 폼 (initial 이 있으면 편집) ---------- */
+function SeriesForm({ initial, onSaved }: { initial?: SeriesItem; onSaved: () => Promise<void> | void }) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [genres, setGenres] = useState<string[]>(initial?.genres ?? []);
+  const [status, setStatus] = useState(initial?.status ?? 'ongoing');
+  const fid = initial?.id ?? 'new';
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -630,20 +652,22 @@ function NewSeriesForm({ onCreated }: { onCreated: () => Promise<void> | void })
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/v1/series', {
-        method: 'POST',
+      const res = await fetch(initial ? `/api/v1/series/${initial.id}` : '/api/v1/series', {
+        method: initial ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify({
           title: title.trim(),
-          description: description.trim() || undefined,
+          // 편집에서는 빈 문자열을 보내야 소개가 지워진다
+          description: initial ? description.trim() : description.trim() || undefined,
           genres,
+          ...(initial ? { status } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data?.error?.message || '시리즈 생성에 실패했습니다.'); return; }
+      if (!res.ok) { setError(data?.error?.message || (initial ? '저장에 실패했습니다.' : '시리즈 생성에 실패했습니다.')); return; }
       setOk(true);
-      setTitle(''); setDescription(''); setGenres([]);
-      await onCreated();
+      if (!initial) { setTitle(''); setDescription(''); setGenres([]); }
+      await onSaved();
     } catch {
       setError('네트워크 오류. 잠시 후 다시 시도해주세요.');
     } finally {
@@ -653,19 +677,19 @@ function NewSeriesForm({ onCreated }: { onCreated: () => Promise<void> | void })
 
   return (
     <form onSubmit={submit} className="studio-card" style={{ display: 'grid', gap: 20, maxWidth: 640 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>새 시리즈 만들기</h3>
+      <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{initial ? '작품 정보 편집' : '새 시리즈 만들기'}</h3>
 
       <div>
-        <label htmlFor="s-title" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
+        <label htmlFor={`s-title-${fid}`} className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>
           제목 <span style={{ color: 'var(--accent)' }}>*</span>
         </label>
-        <input id="s-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+        <input id={`s-title-${fid}`} type="text" value={title} onChange={(e) => setTitle(e.target.value)}
           maxLength={100} required placeholder="예: 달빛 아래 우리" style={INPUT_STYLE} />
       </div>
 
       <div>
-        <label htmlFor="s-desc" className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>소개</label>
-        <textarea id="s-desc" value={description} onChange={(e) => setDescription(e.target.value)}
+        <label htmlFor={`s-desc-${fid}`} className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>소개</label>
+        <textarea id={`s-desc-${fid}`} value={description} onChange={(e) => setDescription(e.target.value)}
           maxLength={2000} rows={4} placeholder="작품 소개를 짧게 적어주세요."
           style={{ ...INPUT_STYLE, resize: 'vertical', fontFamily: 'inherit' }} />
       </div>
@@ -679,7 +703,7 @@ function NewSeriesForm({ onCreated }: { onCreated: () => Promise<void> | void })
           {GENRES.map((g) => {
             const active = genres.includes(g.slug);
             return (
-              <button type="button" key={g.slug} onClick={() => toggleGenre(g.slug)} style={PILL_STYLE(active)}>
+              <button type="button" key={g.slug} aria-pressed={active} onClick={() => toggleGenre(g.slug)} style={PILL_STYLE(active)}>
                 {g.nameKo}
               </button>
             );
@@ -687,12 +711,21 @@ function NewSeriesForm({ onCreated }: { onCreated: () => Promise<void> | void })
         </div>
       </div>
 
+      {initial && (
+        <div>
+          <label htmlFor={`s-status-${fid}`} className="studio-kpi-label" style={{ marginBottom: 6, display: 'block' }}>연재 상태</label>
+          <select id={`s-status-${fid}`} value={status} onChange={(e) => setStatus(e.target.value)} style={INPUT_STYLE}>
+            {Object.entries(STATUS_KO).map(([v, ko]) => <option key={v} value={v}>{ko}</option>)}
+          </select>
+        </div>
+      )}
+
       {error && <FormMsg tone="danger">{error}</FormMsg>}
-      {ok && !error && <FormMsg tone="success">시리즈를 만들었습니다.</FormMsg>}
+      {ok && !error && <FormMsg tone="success">{initial ? '저장했습니다.' : '시리즈를 만들었습니다.'}</FormMsg>}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button type="submit" className="btn studio-btn-accent" disabled={submitting}>
-          {submitting ? '만드는 중...' : '시리즈 만들기'}
+          {initial ? (submitting ? '저장 중...' : '저장') : submitting ? '만드는 중...' : '시리즈 만들기'}
         </button>
       </div>
     </form>

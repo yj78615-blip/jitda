@@ -523,7 +523,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .studio-row-actions { display: flex; gap: 4px; justify-content: flex-end; }
-.studio-row-btn {
+.studio-row-btn { white-space: nowrap;
   height: 28px; padding: 0 10px; border-radius: 999px;
   background: var(--paper); color: var(--ink-2);
   border: 1px solid var(--line);
